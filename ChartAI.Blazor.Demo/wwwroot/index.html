@@ -4,13 +4,31 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChartAI.Blazor.Demo</title>
+    <title>chartai · Blazor</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="ChartAI.Blazor.Demo.styles.css" rel="stylesheet" />
+    <script>
+        // Apply persisted/preferred theme before first paint.
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+        window.chartaiDemo = {
+            isDark() { return document.documentElement.classList.contains('dark'); },
+            toggleTheme() {
+                const dark = !document.documentElement.classList.contains('dark');
+                document.documentElement.classList.toggle('dark', dark);
+                localStorage.setItem('theme', dark ? 'dark' : 'light');
+                return dark;
+            }
+        };
+    </script>
     <script type="importmap"></script>
 </head>
 

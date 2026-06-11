@@ -1,0 +1,30 @@
+@using ChartAI.Blazor.Components
+@using ChartAI.Blazor.Models
+
+<div class="chart-wrapper @(FullWidth ? "full-width" : null)">
+    <div class="chart-header">
+        <span class="chart-label">@Label</span>
+        @if (!string.IsNullOrEmpty(Info))
+        {
+            <span class="chart-info">@Info</span>
+        }
+    </div>
+    <div class="chart-body">
+        <Chart @ref="ChartRef"
+               Config="Config"
+               Series="Series"
+               Plugins="Plugins"
+               Style="position:absolute;inset:0;width:100%;height:100%;" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Info { get; set; }
+    [Parameter] public ChartConfig Config { get; set; } = new();
+    [Parameter] public IEnumerable<ChartSeries> Series { get; set; } = Array.Empty<ChartSeries>();
+    [Parameter] public ChartPlugins Plugins { get; set; } = ChartPlugins.None;
+    [Parameter] public bool FullWidth { get; set; }
+
+    public Chart? ChartRef { get; private set; }
+}

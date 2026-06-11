@@ -1,85 +1,395 @@
 @page "/"
-@using ChartAI.Blazor.Components
-@using ChartAI.Blazor.Models
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
-<PageTitle>ChartAI.Blazor Demo</PageTitle>
+<PageTitle>chartai · Blazor</PageTitle>
 
-<h1>ChartAI.Blazor Demo</h1>
+<div class="landing">
+    <div class="landing-header">
+        <div>
+            <h1 class="landing-title">chartai</h1>
+            <p class="landing-subtitle">tiny package big performance · Blazor wrapper</p>
+        </div>
+        <button class="theme-btn" title="Toggle theme" @onclick="ToggleTheme">
+            @if (_isDark)
+            {
+                <svg class="theme-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+            }
+            else
+            {
+                <svg class="theme-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+            }
+        </button>
+    </div>
 
-<div style="margin-bottom: 20px;">
-    <button class="btn btn-primary" @onclick="ToggleDarkMode">Toggle Dark Mode</button>
-    <button class="btn btn-secondary" @onclick="ToggleType">Toggle Type (Line/Band)</button>
-    <button class="btn btn-info" @onclick="AddData">Add Random Data</button>
+    <h2 class="landing-section-heading">Charts</h2>
+
+    <div class="section">
+        <h2 class="section-title">Base</h2>
+        <p class="section-description">All chart types in simple form</p>
+        <div class="chart-row">
+            @foreach (var d in _baseCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Multi-Series Charts</h2>
+        <p class="section-description">Same charts with 3 series each</p>
+        <div class="chart-row">
+            @foreach (var d in _seriesCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Data Spikes</h2>
+        <p class="section-description">High-frequency data with extreme volatility</p>
+        <div class="chart-row">
+            <ChartCard Label="Spiky Line Chart" Info="100,000 points" FullWidth="true"
+                       Config="_spikes.Config" Series="_spikes.Series" />
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Live Data Updates</h2>
+        <p class="section-description">Real-time data streaming at configurable speeds</p>
+        <div class="section-controls">
+            <div class="control-item">
+                <label>Update Speed</label>
+                <div class="speed-buttons">
+                    <button class="speed-btn @(_liveSpeed == 1 ? "active" : null)" @onclick="() => SetSpeed(1)">Slow (1/s)</button>
+                    <button class="speed-btn @(_liveSpeed == 10 ? "active" : null)" @onclick="() => SetSpeed(10)">Med (10/s)</button>
+                    <button class="speed-btn @(_liveSpeed == 60 ? "active" : null)" @onclick="() => SetSpeed(60)">Fast (60/s)</button>
+                </div>
+            </div>
+            <div class="control-item">
+                <label>Mode</label>
+                <label class="toggle" style="margin:0;">
+                    <input type="checkbox" checked="@_liveAccumulate" @onchange="OnAccumulateChanged" />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">Accumulate</span>
+                </label>
+            </div>
+            <div class="stats-display">Points: @_liveDataX.Count (@(_liveAccumulate ? "Accumulate" : "Ring Buffer"))</div>
+        </div>
+        <div class="chart-row">
+            <ChartCard @ref="_liveLine" Label="Live Line" Info="Streaming" Config="LiveCfg()" Series="LiveSeries(1)" />
+            <ChartCard @ref="_liveScatter" Label="Live Scatter" Info="Streaming" Config="LiveCfg(ChartType.Scatter)" Series="LiveSeries(2)" />
+            <ChartCard @ref="_liveLine2" Label="Live Line 2" Info="Streaming" Config="LiveCfg()" Series="LiveSeries(3)" />
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Big Data</h2>
+        <p class="section-description">Massive datasets for performance testing</p>
+        <div class="section-controls">
+            <div class="control-item">
+                <label>Data Points</label>
+                <input type="number" class="input" @bind="_bigDataCount" min="10000" step="100000" />
+            </div>
+            <div class="control-item">
+                <button disabled="@_bigDataBusy" @onclick="GenerateBigData">Generate Charts</button>
+            </div>
+            <div class="stats-display">@_bigDataStats</div>
+        </div>
+        <div class="chart-row">
+            <ChartCard Label="Big Data Line" Info="@_bigDataLineInfo" Config="Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price)" Series="_bigDataLineSeries" />
+            <ChartCard Label="Big Data Scatter" Info="@_bigDataScatterInfo" Config="Cfg(ChartType.Scatter, AxisFormat.Index, AxisFormat.Number)" Series="_bigDataScatterSeries" />
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Big Data Series</h2>
+        <p class="section-description">Extreme multi-series performance test</p>
+        <div class="section-controls">
+            <div class="control-item">
+                <label>Series Count</label>
+                <input type="number" class="input" @bind="_bigSeriesCount" min="1" step="100" />
+            </div>
+            <div class="control-item">
+                <label>Points per Series</label>
+                <input type="number" class="input" @bind="_bigSeriesPoints" min="100" step="100" />
+            </div>
+            <div class="control-item">
+                <button disabled="@_bigSeriesBusy" @onclick="GenerateBigSeries">Generate Chart</button>
+            </div>
+            <div class="stats-display">@_bigSeriesStats</div>
+        </div>
+        <div class="chart-row">
+            <ChartCard Label="Massive Multi-Series Line" Info="@_bigSeriesInfo" FullWidth="true"
+                       Config="Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price)" Series="_bigSeriesSeries" />
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Step Chart</h2>
+        <p class="section-description">Right-angle step interpolation. Three modes: after, before, center</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _stepCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Histogram</h2>
+        <p class="section-description">GPU-binned frequency distribution from continuous data</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _histogramCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Heatmap</h2>
+        <p class="section-description">2D color grid. Series x=column, y=row, value=intensity (0–1). Four built-in color scales</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _heatmapCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Bubble Chart</h2>
+        <p class="section-description">Scatter + size encoding. Series requires r[] extra array for per-point radius</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _bubbleCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Baseline Area</h2>
+        <p class="section-description">Area filled above/below a configurable Y baseline with separate positive/negative colors</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _baselineCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Error Band</h2>
+        <p class="section-description">Central line with shaded confidence band between lo[] and hi[] extra arrays</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _errorBandCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">OHLC Chart</h2>
+        <p class="section-description">Open-high-low-close tick marks. Shares the candlestick data format</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _ohlcCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Waterfall Chart</h2>
+        <p class="section-description">Sequential cumulative bars. Pass total markers for reset-to-zero summary bars</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _waterfallCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <h2 class="landing-section-heading">Plugins</h2>
+
+    <div class="section">
+        <h2 class="section-title">Legend</h2>
+        <p class="section-description">defaultOpen, alwaysOpen, maxLabelChars</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _legendCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Labels</h2>
+        <p class="section-description">textColor, labelSize, gridColor</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _labelsCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Zoom</h2>
+        <p class="section-description">zoomMode: both | x-only | y-only | none</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _zoomCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Hover</h2>
+        <p class="section-description">showTooltip, formatX, formatY, pillDecayMs</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _hoverCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Annotations</h2>
+        <p class="section-description">Reference lines and shaded regions: hline, vline, hregion, vregion</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _annotationCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+        <div class="chart-row" style="margin-top:12px;">
+            <div class="chart-wrapper" style="flex:1 1 100%;">
+                <div class="chart-header">
+                    <span class="chart-label">Interactive</span>
+                    <span class="chart-info">Add/remove annotations dynamically</span>
+                </div>
+                <div class="chart-body" style="min-height:360px;">
+                    <Chart @ref="_interactiveChart" Config="_interactiveConfig" Series="_annotationBase"
+                           Style="position:absolute;inset:0;width:100%;height:100%;" />
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-tertiary);border-top:1px solid var(--border-color);">
+                    <select @bind="_newAnnType" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-secondary);color:inherit;">
+                        <option value="@AnnotationType.HLine">H Line</option>
+                        <option value="@AnnotationType.VLine">V Line</option>
+                        <option value="@AnnotationType.HRegion">H Region</option>
+                        <option value="@AnnotationType.VRegion">V Region</option>
+                    </select>
+                    <input type="number" placeholder="Value" @bind="_newAnnValue" class="input" style="width:90px;" />
+                    <input type="text" placeholder="Label (optional)" @bind="_newAnnLabel" class="input" style="width:140px;" />
+                    <button class="speed-btn" @onclick="AddAnnotation">Add</button>
+                    <span style="font-size:11px;opacity:0.6;">@_interactiveAnnotations.Count annotation(s)</span>
+                    @if (_interactiveAnnotations.Count > 0)
+                    {
+                        <button class="speed-btn" @onclick="ClearAnnotations">Clear</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Threshold</h2>
+        <p class="section-description">Colored fill bands above/below configurable Y thresholds with labeled lines</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _thresholdCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Crosshair</h2>
+        <p class="section-description">Lightweight cursor guide lines. Configurable axes, color, and dash pattern</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _crosshairCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" Plugins="ChartPlugins.Crosshair" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Watermark</h2>
+        <p class="section-description">Semi-transparent text drawn behind the GPU chart layer</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _watermarkCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Stats</h2>
+        <p class="section-description">Live panel showing min/max/mean/σ for the visible data window</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _statsCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" Plugins="ChartPlugins.Stats" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Ruler</h2>
+        <p class="section-description">Click two points to measure. Right-click near an endpoint to remove</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _rulerCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" Plugins="ChartPlugins.Ruler" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Tooltip Pin</h2>
+        <p class="section-description">Click to pin a floating tooltip at any data point. Up to 5 pins persist</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _tooltipPinCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" Plugins="ChartPlugins.TooltipPin" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Minimap</h2>
+        <p class="section-description">Corner viewport thumbnail with a highlighted rectangle for the current view</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _minimapCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" Plugins="ChartPlugins.Minimap" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Range Selector</h2>
+        <p class="section-description">Mini overview below the chart. Drag the brush to pan/zoom the main chart</p>
+        <div class="chart-row">
+            <ChartCard Label="Range Selector" Info="Drag brush to navigate · resize edges to zoom" FullWidth="true"
+                       Config="_rangeSelector.Config" Series="_rangeSelector.Series" Plugins="ChartPlugins.RangeSelector" />
+        </div>
+    </div>
 </div>
-
-<div style="width: 100%; height: 500px; border: 1px solid #ccc;">
-    <Chart Config="config" Series="series" />
-</div>
-
-@code {
-    private ChartConfig config = new ChartConfig
-    {
-        Type = ChartType.Line,
-        IsDark = false,
-        ShowTooltip = true,
-        ZoomMode = ZoomMode.XOnly
-    };
-
-    private List<ChartSeries> series = new List<ChartSeries>();
-
-    private Random rnd = new Random();
-
-    protected override void OnInitialized()
-    {
-        InitializeData();
-    }
-
-    private void InitializeData()
-    {
-        var s1 = new ChartSeries { Label = "Temperature", Color = "#007bff" };
-        var s2 = new ChartSeries { Label = "Pressure", Color = "#dc3545" };
-
-        int points = 1000;
-        s1.X = new double[points];
-        s1.Y = new double?[points];
-        s1.Lo = new double?[points];
-        s1.Hi = new double?[points];
-
-        s2.X = new double[points];
-        s2.Y = new double?[points];
-
-        double y1 = 20;
-        double y2 = 100;
-
-        for (int i = 0; i < points; i++)
-        {
-            s1.X[i] = i;
-            y1 += (rnd.NextDouble() - 0.5) * 2;
-            s1.Y[i] = y1;
-            s1.Lo[i] = y1 - rnd.NextDouble() * 5;
-            s1.Hi[i] = y1 + rnd.NextDouble() * 5;
-
-            s2.X[i] = i;
-            y2 += (rnd.NextDouble() - 0.5) * 5;
-            s2.Y[i] = y2;
-        }
-
-        series = new List<ChartSeries> { s1, s2 };
-    }
-
-    private void AddData()
-    {
-        InitializeData();
-    }
-
-    private void ToggleDarkMode()
-    {
-        config.IsDark = !config.IsDark;
-        // StateHasChanged implicitly called, Chart component will re-render
-    }
-
-    private void ToggleType()
-    {
-        config.Type = config.Type == ChartType.Line ? ChartType.ErrorBand : ChartType.Line;
-    }
-}

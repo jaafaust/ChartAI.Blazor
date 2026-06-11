@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chartai-demo",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "ChartAI.Blazor.Demo/ChartAI.Blazor.Demo.csproj", "--launch-profile", "http"],
+      "port": 5275
+    }
+  ]
+}
