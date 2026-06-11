@@ -1,0 +1,85 @@
+@page "/"
+@using ChartAI.Blazor.Components
+@using ChartAI.Blazor.Models
+
+<PageTitle>ChartAI.Blazor Demo</PageTitle>
+
+<h1>ChartAI.Blazor Demo</h1>
+
+<div style="margin-bottom: 20px;">
+    <button class="btn btn-primary" @onclick="ToggleDarkMode">Toggle Dark Mode</button>
+    <button class="btn btn-secondary" @onclick="ToggleType">Toggle Type (Line/Band)</button>
+    <button class="btn btn-info" @onclick="AddData">Add Random Data</button>
+</div>
+
+<div style="width: 100%; height: 500px; border: 1px solid #ccc;">
+    <Chart Config="config" Series="series" />
+</div>
+
+@code {
+    private ChartConfig config = new ChartConfig
+    {
+        Type = ChartType.Line,
+        IsDark = false,
+        ShowTooltip = true,
+        ZoomMode = ZoomMode.XOnly
+    };
+
+    private List<ChartSeries> series = new List<ChartSeries>();
+
+    private Random rnd = new Random();
+
+    protected override void OnInitialized()
+    {
+        InitializeData();
+    }
+
+    private void InitializeData()
+    {
+        var s1 = new ChartSeries { Label = "Temperature", Color = "#007bff" };
+        var s2 = new ChartSeries { Label = "Pressure", Color = "#dc3545" };
+
+        int points = 1000;
+        s1.X = new double[points];
+        s1.Y = new double?[points];
+        s1.Lo = new double?[points];
+        s1.Hi = new double?[points];
+
+        s2.X = new double[points];
+        s2.Y = new double?[points];
+
+        double y1 = 20;
+        double y2 = 100;
+
+        for (int i = 0; i < points; i++)
+        {
+            s1.X[i] = i;
+            y1 += (rnd.NextDouble() - 0.5) * 2;
+            s1.Y[i] = y1;
+            s1.Lo[i] = y1 - rnd.NextDouble() * 5;
+            s1.Hi[i] = y1 + rnd.NextDouble() * 5;
+
+            s2.X[i] = i;
+            y2 += (rnd.NextDouble() - 0.5) * 5;
+            s2.Y[i] = y2;
+        }
+
+        series = new List<ChartSeries> { s1, s2 };
+    }
+
+    private void AddData()
+    {
+        InitializeData();
+    }
+
+    private void ToggleDarkMode()
+    {
+        config.IsDark = !config.IsDark;
+        // StateHasChanged implicitly called, Chart component will re-render
+    }
+
+    private void ToggleType()
+    {
+        config.Type = config.Type == ChartType.Line ? ChartType.ErrorBand : ChartType.Line;
+    }
+}

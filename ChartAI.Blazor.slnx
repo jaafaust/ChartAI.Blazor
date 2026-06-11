@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ChartAI.Blazor.Demo/ChartAI.Blazor.Demo.csproj" />
+  <Project Path="ChartAI.Blazor/ChartAI.Blazor.csproj" />
+</Solution>
