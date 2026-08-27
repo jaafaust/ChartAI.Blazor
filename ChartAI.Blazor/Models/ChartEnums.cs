@@ -68,6 +68,14 @@ public enum AxisFormat
     [JsonStringEnumMemberName("degree")] Degree,
 }
 
+/// <summary>Which side of the plot a Y axis is drawn on.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<AxisSide>))]
+public enum AxisSide
+{
+    [JsonStringEnumMemberName("left")] Left,
+    [JsonStringEnumMemberName("right")] Right,
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<WatermarkPosition>))]
 public enum WatermarkPosition
 {

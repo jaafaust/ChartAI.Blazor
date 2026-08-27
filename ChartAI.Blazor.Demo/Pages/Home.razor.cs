@@ -19,6 +19,9 @@ public partial class Home
     private static ChartSeries S(string label, string color, double[] x, double[] y)
         => new() { Label = label, Color = color, X = x, Y = y };
 
+    private static ChartSeries S(string label, string color, double[] x, double[] y, string yAxis)
+        => new() { Label = label, Color = color, X = x, Y = y, YAxis = yAxis };
+
     private static readonly string Blue = DemoData.RgbHex(0.3, 0.6, 1);
     private static readonly string Purple = DemoData.RgbHex(0.6, 0.4, 0.9);
     private static readonly string Red = DemoData.RgbHex(1, 0.4, 0.4);
@@ -28,6 +31,7 @@ public partial class Home
     // ─── Section data ──────────────────────────────────────────────────────
     private List<ChartDef> _baseCharts = new();
     private List<ChartDef> _seriesCharts = new();
+    private List<ChartDef> _multiAxisCharts = new();
     private ChartDef _spikes = default!;
     private List<ChartDef> _stepCharts = new();
     private List<ChartDef> _histogramCharts = new();
@@ -115,6 +119,60 @@ public partial class Home
                 MultiSeries(3, () => DemoData.Generate(5000, DataPattern.Cyclic), false)),
             new("Area Chart", "1,000 points × 3 series", Cfg(ChartType.Area, AxisFormat.Index, AxisFormat.Price),
                 MultiSeries(3, () => DemoData.Generate(1000, DataPattern.Trending), false)),
+        };
+
+        // Multiple Y axes
+        var maPrice = DemoData.Generate(1000, DataPattern.Trending);
+        var maTemp = DemoData.Generate(1000, DataPattern.Cyclic);
+        var maTempY = maTemp.Y.Select(v => v * 0.35 - 5).ToArray();          // ≈ −5…30 °
+        var maVolume = DemoData.Generate(1000, DataPattern.Cyclic);
+        var maVolumeY = maVolume.Y.Select(v => v * 25_000).ToArray();        // ≈ 0…2.5M
+        var maPercent = DemoData.Generate(1000, DataPattern.Declining);
+        var maPercentY = maPercent.Y.Select(v => v / 10).ToArray();          // ≈ 0…10
+
+        var maDual = Cfg(ChartType.Line, AxisFormat.Index, AxisFormat.None);
+        maDual.YAxes = new()
+        {
+            new YAxisConfig { Id = "price", Format = AxisFormat.Price, Color = Blue },
+            new YAxisConfig { Id = "temp", Side = AxisSide.Right, Format = AxisFormat.Degree, Color = Orange },
+        };
+
+        var maTriple = Cfg(ChartType.Line, AxisFormat.Index, AxisFormat.None);
+        maTriple.YAxes = new()
+        {
+            new YAxisConfig { Id = "price", Format = AxisFormat.Price, Color = Blue },
+            new YAxisConfig { Id = "volume", Side = AxisSide.Right, Format = AxisFormat.Number, Color = Green },
+            new YAxisConfig { Id = "pct", Side = AxisSide.Right, Format = AxisFormat.Fixed1, Color = Purple },
+        };
+
+        var maCustom = Cfg(ChartType.Line, AxisFormat.Index, AxisFormat.None);
+        maCustom.YAxisGap = 18;
+        maCustom.YAxes = new()
+        {
+            new YAxisConfig { Id = "price", Format = AxisFormat.Price, Color = Blue, Width = 70 },
+            new YAxisConfig { Id = "temp", Side = AxisSide.Right, Format = AxisFormat.Degree, Color = Orange, Width = 70, Min = -20, Max = 40 },
+            new YAxisConfig { Id = "pct", Side = AxisSide.Right, Format = AxisFormat.Fixed1, Color = Purple, Width = 45 },
+        };
+
+        _multiAxisCharts = new()
+        {
+            new("Left + Right", "price left · temperature right", maDual, new[]
+            {
+                S("Price", Blue, maPrice.X, maPrice.Y, "price"),
+                S("Temperature", Orange, maTemp.X, maTempY, "temp"),
+            }),
+            new("Three Axes", "one left · two stacked right", maTriple, new[]
+            {
+                S("Price", Blue, maPrice.X, maPrice.Y, "price"),
+                S("Volume", Green, maVolume.X, maVolumeY, "volume"),
+                S("Growth %", Purple, maPercent.X, maPercentY, "pct"),
+            }),
+            new("Custom Width + Gap", "width 70/45 · yAxisGap 18 · manual min/max", maCustom, new[]
+            {
+                S("Price", Blue, maPrice.X, maPrice.Y, "price"),
+                S("Temperature", Orange, maTemp.X, maTempY, "temp"),
+                S("Growth %", Purple, maPercent.X, maPercentY, "pct"),
+            }),
         };
 
         // Spikes

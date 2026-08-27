@@ -55,6 +55,17 @@
     </div>
 
     <div class="section">
+        <h2 class="section-title">Multiple Y Axes</h2>
+        <p class="section-description">Per-series axes via yAxes + series yAxis id. Axes stack left/right without overlapping; width and yAxisGap set the distance. Tooltip and legend combine all series</p>
+        <div class="chart-row chart-row-compact">
+            @foreach (var d in _multiAxisCharts)
+            {
+                <ChartCard Label="@d.Label" Info="@d.Info" Config="d.Config" Series="d.Series" />
+            }
+        </div>
+    </div>
+
+    <div class="section">
         <h2 class="section-title">Data Spikes</h2>
         <p class="section-description">High-frequency data with extreme volatility</p>
         <div class="chart-row">

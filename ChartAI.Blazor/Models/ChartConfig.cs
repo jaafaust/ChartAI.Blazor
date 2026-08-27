@@ -152,6 +152,25 @@ public class ChartConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? MaxSamples { get; set; }
 
+    // ─── Multiple Y axes ───────────────────────────────────────────────────
+    /// <summary>
+    /// Optional multi Y-axis configuration. Each series selects its axis via
+    /// <see cref="ChartSeries.YAxis"/> (matching <see cref="YAxisConfig.Id"/>);
+    /// unassigned series use the first axis. The first axis defines the chart's
+    /// internal coordinate space (thresholds/annotations/rulers measure in its
+    /// units); additional axes are independently scaled relabelings of it.
+    /// Axes on the same side stack outward without overlapping, separated by
+    /// <see cref="YAxisGap"/>. Null = single default left axis.
+    /// </summary>
+    [JsonPropertyName("yAxes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<YAxisConfig>? YAxes { get; set; }
+
+    /// <summary>Horizontal distance in px between adjacent Y-axis strips on the same side (default 6).</summary>
+    [JsonPropertyName("yAxisGap")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? YAxisGap { get; set; }
+
     // ─── Legend (nested) ───────────────────────────────────────────────────
     [JsonPropertyName("legend")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -291,6 +310,51 @@ public class ChartBounds
     [JsonPropertyName("maxY")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? MaxY { get; set; }
+}
+
+/// <summary>
+/// One Y axis of a multi-axis chart (see <see cref="ChartConfig.YAxes"/>).
+/// </summary>
+public class YAxisConfig
+{
+    /// <summary>Identifier referenced by <see cref="ChartSeries.YAxis"/>. Defaults to the axis' index as a string.</summary>
+    [JsonPropertyName("id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
+    /// <summary>Side the axis is drawn on. Default: first axis left, additional axes right.</summary>
+    [JsonPropertyName("side")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AxisSide? Side { get; set; }
+
+    /// <summary>Tick/tooltip formatter for this axis. Falls back to <see cref="ChartConfig.FormatY"/>.</summary>
+    [JsonPropertyName("format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AxisFormat? Format { get; set; }
+
+    /// <summary>Manual lower bound (exact, no padding). Null = auto from the axis' series.</summary>
+    [JsonPropertyName("min")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Min { get; set; }
+
+    /// <summary>Manual upper bound (exact, no padding). Null = auto from the axis' series.</summary>
+    [JsonPropertyName("max")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Max { get; set; }
+
+    /// <summary>Tick label color (CSS). Defaults to the chart text color.</summary>
+    [JsonPropertyName("color")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Color { get; set; }
+
+    /// <summary>
+    /// Width in px of this axis' label strip (default 55). Together with
+    /// <see cref="ChartConfig.YAxisGap"/> this sets the horizontal distance
+    /// between stacked axes on the same side.
+    /// </summary>
+    [JsonPropertyName("width")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Width { get; set; }
 }
 
 public class LegendConfig

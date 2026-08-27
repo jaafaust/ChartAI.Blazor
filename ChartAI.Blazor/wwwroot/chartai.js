@@ -110,6 +110,9 @@ class Chart {
         bgColor: patch.bgColor
       });
     }
+    if ("yAxes" in patch || "yAxisGap" in patch || "defaultBounds" in patch) {
+      this._mgr.refreshSeriesData(c);
+    }
     this._mgr.requestRender(this.id);
     this._mgr.drawChart(c);
   }
@@ -483,7 +486,7 @@ class _ChartManager {
       const n = s.x.length;
       const color = parseColor(s.color);
       if (n === 0)
-        return { label: s.label, color, rawX: [], rawY: [], extra: {} };
+        return { label: s.label, color, yAxis: s.yAxis, rawX: [], rawY: [], extra: {} };
       const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => s.x[a] - s.x[b]);
       const extra = {};
       for (const key in s) {
@@ -494,60 +497,168 @@ class _ChartManager {
       return {
         label: s.label,
         color,
+        yAxis: s.yAxis,
         rawX: idx.map((i) => s.x[i]),
         rawY: idx.map((i) => s.y[i]),
         extra
       };
     });
+    this.refreshSeriesData(chart);
+  }
+  // Re-derive axes, bounds and GPU-space data from chart.series and push it to
+  // the worker. Also called after axis-affecting config changes (yAxes, gap,
+  // defaultBounds), so those take effect without re-supplying the data.
+  refreshSeriesData(chart) {
+    if (!this.worker || chart.series.length === 0)
+      return;
+    const axes = yAxisDefs(chart);
+    chart.yAxes = axes;
     const customBounds = chart.renderer.computeBounds?.(chart.series);
-    let { minX, maxX, minY, maxY } = customBounds ?? (() => {
-      let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+    let minX, maxX, minY, maxY;
+    if (!axes) {
       for (const s of chart.series) {
-        for (let i = 0;i < s.rawX.length; i++) {
-          if (s.rawX[i] < minX2)
-            minX2 = s.rawX[i];
-          if (s.rawX[i] > maxX2)
-            maxX2 = s.rawX[i];
-          if (s.rawY[i] < minY2)
-            minY2 = s.rawY[i];
-          if (s.rawY[i] > maxY2)
-            maxY2 = s.rawY[i];
-        }
+        s.axisIndex = 0;
+        s.plotY = s.rawY;
       }
-      const px = (maxX2 - minX2) * 0.05 || 1;
-      const py = (maxY2 - minY2) * 0.1 || 1;
-      return {
-        minX: minX2 - px,
-        maxX: maxX2 + px,
-        minY: minY2 - py,
-        maxY: maxY2 + py
-      };
-    })();
-    const db = chart.config.defaultBounds;
-    if (db) {
-      if (db.minX !== undefined)
-        minX = db.minX;
-      if (db.maxX !== undefined)
-        maxX = db.maxX;
-      if (db.minY !== undefined)
-        minY = db.minY;
-      if (db.maxY !== undefined)
-        maxY = db.maxY;
+      ({ minX, maxX, minY, maxY } = customBounds ?? (() => {
+        let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+        for (const s of chart.series) {
+          for (let i = 0;i < s.rawX.length; i++) {
+            if (s.rawX[i] < minX2)
+              minX2 = s.rawX[i];
+            if (s.rawX[i] > maxX2)
+              maxX2 = s.rawX[i];
+            if (s.rawY[i] < minY2)
+              minY2 = s.rawY[i];
+            if (s.rawY[i] > maxY2)
+              maxY2 = s.rawY[i];
+          }
+        }
+        const px = (maxX2 - minX2) * 0.05 || 1;
+        const py = (maxY2 - minY2) * 0.1 || 1;
+        return {
+          minX: minX2 - px,
+          maxX: maxX2 + px,
+          minY: minY2 - py,
+          maxY: maxY2 + py
+        };
+      })());
+      const db = chart.config.defaultBounds;
+      if (db) {
+        if (db.minX !== undefined)
+          minX = db.minX;
+        if (db.maxX !== undefined)
+          maxX = db.maxX;
+        if (db.minY !== undefined)
+          minY = db.minY;
+        if (db.maxY !== undefined)
+          maxY = db.maxY;
+      }
+    } else {
+      // X bounds: renderer-specific if available, else data extent + 5% pad.
+      if (customBounds) {
+        minX = customBounds.minX;
+        maxX = customBounds.maxX;
+      } else {
+        let lo = Infinity, hi = -Infinity;
+        for (const s of chart.series) {
+          for (const x of s.rawX) {
+            if (x < lo)
+              lo = x;
+            if (x > hi)
+              hi = x;
+          }
+        }
+        if (!isFinite(lo)) {
+          lo = 0;
+          hi = 1;
+        }
+        const px = (hi - lo) * 0.05 || 1;
+        minX = lo - px;
+        maxX = hi + px;
+      }
+      const byId = new Map(axes.map((a, i) => [a.id, i]));
+      for (const s of chart.series)
+        s.axisIndex = s.yAxis != null && byId.has(String(s.yAxis)) ? byId.get(String(s.yAxis)) : 0;
+      // Per-axis Y bounds from that axis' series (incl. y-positional channels),
+      // 10% pad; manual min/max win.
+      for (let ai = 0;ai < axes.length; ai++) {
+        const ax = axes[ai];
+        let lo = Infinity, hi = -Infinity;
+        for (const s of chart.series) {
+          if (s.axisIndex !== ai)
+            continue;
+          for (const v of s.rawY) {
+            if (v < lo)
+              lo = v;
+            if (v > hi)
+              hi = v;
+          }
+          for (const key of Y_PLOT_CHANNELS) {
+            const arr = s.extra[key];
+            if (!arr)
+              continue;
+            for (const v of arr) {
+              if (v < lo)
+                lo = v;
+              if (v > hi)
+                hi = v;
+            }
+          }
+        }
+        if (!isFinite(lo)) {
+          lo = 0;
+          hi = 1;
+        }
+        const pad = (hi - lo) * 0.1 || 1;
+        ax.min = ax.min ?? lo - pad;
+        ax.max = ax.max ?? hi + pad;
+      }
+      const db = chart.config.defaultBounds;
+      if (db) {
+        if (db.minX !== undefined)
+          minX = db.minX;
+        if (db.maxX !== undefined)
+          maxX = db.maxX;
+        if (db.minY !== undefined)
+          axes[0].min = db.minY;
+        if (db.maxY !== undefined)
+          axes[0].max = db.maxY;
+      }
+      // The first axis defines the internal plot space; every other axis is an
+      // affine remap into it (plotY = y * scale + offset).
+      const prim = axes[0];
+      const primRange = prim.max - prim.min || 1;
+      for (const ax of axes) {
+        const r = ax.max - ax.min || 1;
+        ax.scale = primRange / r;
+        ax.offset = prim.min - ax.min * ax.scale;
+      }
+      minY = prim.min;
+      maxY = prim.max;
+      for (const s of chart.series) {
+        const ax = axes[s.axisIndex];
+        s.plotY = ax.scale === 1 && ax.offset === 0 ? s.rawY : s.rawY.map((v) => v * ax.scale + ax.offset);
+      }
     }
     chart.bounds = { minX, maxX, minY, maxY };
     const { bufferSizes, perSeriesPassMeta } = this.computeRendererMeta(chart.renderer, chart);
     const hidden = chart.config.hiddenSeries ?? new Set;
     const seriesData = chart.series.map((s, i) => {
+      const ax = axes?.[s.axisIndex];
+      const mapped = !!ax && (ax.scale !== 1 || ax.offset !== 0);
       const extra = {};
-      for (const key in s.extra)
-        extra[key] = new Float32Array(s.extra[key]);
+      for (const key in s.extra) {
+        const src = mapped && Y_PLOT_CHANNELS.has(key) ? s.extra[key].map((v) => v * ax.scale + ax.offset) : mapped && key === "h" ? s.extra[key].map((v) => v * ax.scale) : s.extra[key];
+        extra[key] = new Float32Array(src);
+      }
       return {
         label: s.label,
         colorR: s.color.r,
         colorG: s.color.g,
         colorB: s.color.b,
         dataX: new Float32Array(s.rawX),
-        dataY: new Float32Array(s.rawY),
+        dataY: new Float32Array(s.plotY ?? s.rawY),
         extra,
         hidden: hidden.has(i)
       };
@@ -559,7 +670,7 @@ class _ChartManager {
     ]);
     this.worker.postMessage({
       type: M.UPDATE_SERIES,
-      id,
+      id: chart.id,
       series: seriesData,
       bounds: chart.bounds,
       bufferSizes,
@@ -688,11 +799,93 @@ var ChartManager = _ChartManager.getInstance();
 // src/plugins/shared.ts
 var MARGIN = { left: 55, right: 10, top: 8, bottom: 45 };
 
+// ─── Multi Y-axis support ────────────────────────────────────────────────────
+var DEFAULT_AXIS_WIDTH = 55;
+var DEFAULT_AXIS_GAP = 6;
+// Extra channels holding Y positions that must be remapped into primary-axis
+// space for series bound to a secondary axis.
+var Y_PLOT_CHANNELS = new Set(["open", "high", "low", "lo", "hi"]);
+
+// Resolve config.yAxes into normalized descriptors, or null when the chart
+// uses the implicit single default axis. Defaults: first axis left, others right.
+function yAxisDefs(chart) {
+  const defs = chart.config.yAxes;
+  if (!Array.isArray(defs) || defs.length === 0)
+    return null;
+  return defs.map((d, i) => ({
+    id: d.id ?? String(i),
+    side: d.side === "right" ? "right" : d.side === "left" ? "left" : i === 0 ? "left" : "right",
+    width: d.width ?? DEFAULT_AXIS_WIDTH,
+    format: typeof d.format === "function" ? d.format : undefined,
+    color: d.color,
+    min: d.min,
+    max: d.max
+  }));
+}
+
+function hasRightAxes(chart) {
+  const defs = yAxisDefs(chart);
+  return !!defs && defs.some((d) => d.side === "right");
+}
+
+// Chart margins including the strip claimed by every configured y-axis.
+// Falls back to the classic MARGIN for implicit single-axis charts.
+function chartMargin(chart) {
+  const defs = yAxisDefs(chart);
+  if (!defs)
+    return MARGIN;
+  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
+  let left = 0, right = 0, nl = 0, nr = 0;
+  for (const d of defs) {
+    if (d.side === "right")
+      right += (nr++ > 0 ? gap : 0) + d.width;
+    else
+      left += (nl++ > 0 ? gap : 0) + d.width;
+  }
+  return {
+    left: nl > 0 ? left : MARGIN.right,
+    right: nr > 0 ? right : MARGIN.right,
+    top: MARGIN.top,
+    bottom: MARGIN.bottom
+  };
+}
+
+// Horizontal strip [x0, x1] occupied by each y-axis: the first axis of a side
+// sits next to the plot, later ones stack outward separated by yAxisGap.
+function yAxisStrips(chart, m, w) {
+  const defs = yAxisDefs(chart);
+  if (!defs)
+    return null;
+  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
+  let leftEdge = m.left, rightEdge = w - m.right;
+  return defs.map((d, i) => {
+    const axis = chart.yAxes?.[i];
+    if (d.side === "right") {
+      const strip = { ...d, axis, x0: rightEdge, x1: rightEdge + d.width };
+      rightEdge += d.width + gap;
+      return strip;
+    }
+    const strip = { ...d, axis, x0: leftEdge - d.width, x1: leftEdge };
+    leftEdge -= d.width + gap;
+    return strip;
+  });
+}
+
+// Formatter for the axis a given series is bound to (falls back to formatY).
+function seriesAxisFormat(chart, seriesIndex) {
+  const ax = chart.yAxes?.[chart.series[seriesIndex]?.axisIndex ?? 0];
+  return ax?.format ?? chart.config.formatY ?? String;
+}
+
 // src/plugins/labels.ts
 var DEFAULT_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 var DEFAULT_LABEL_SIZE = 12;
-function computeHomeView(width, height) {
-  const l = 32, t = 8, r = 8, b = 48;
+function computeHomeView(chart) {
+  const { width, height } = chart;
+  const m = chartMargin(chart);
+  // Preserve the classic insets (l 32 / r 8 for MARGIN 55/10) while growing
+  // with the strips claimed by additional y-axes.
+  const l = Math.max(8, m.left - 23), t = 8, r = Math.max(8, m.right - 2), b = 48;
   const innerW = width - l - r;
   const innerH = height - t - b;
   return {
@@ -714,7 +907,7 @@ var niceTicks = (min, max, count) => {
   return ticks;
 };
 var getViewState = (chart) => {
-  const { width: w, height: h } = chart, m = MARGIN;
+  const { width: w, height: h } = chart, m = chartMargin(chart);
   const { bounds: b, view: v } = chart, fullX = b.maxX - b.minX, fullY = b.maxY - b.minY;
   const rx = fullX / v.zoomX, ry = fullY / v.zoomY;
   const mx = b.minX + v.panX * fullX, my = b.minY + v.panY * fullY;
@@ -736,13 +929,13 @@ var getViewState = (chart) => {
 var labelsPlugin = {
   name: "labels",
   install(chart) {
-    const hv = computeHomeView(chart.width, chart.height);
+    const hv = computeHomeView(chart);
     chart.homeView = hv;
     chart.view = { ...hv };
     ChartManager.requestRender(chart.id);
   },
   beforeDraw(ctx, chart) {
-    const hv = computeHomeView(chart.width, chart.height);
+    const hv = computeHomeView(chart);
     const old = chart.homeView;
     chart.homeView = hv;
     if (hv.zoomX !== old.zoomX || hv.zoomY !== old.zoomY || hv.panX !== old.panX || hv.panY !== old.panY) {
@@ -750,6 +943,7 @@ var labelsPlugin = {
       ChartManager.requestRender(chart.id);
     }
     const { w, h, m, rx, ry, mx, my, grid } = getViewState(chart);
+    const plotRight = w - (hasRightAxes(chart) ? m.right : 0);
     ctx.strokeStyle = grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -757,12 +951,12 @@ var labelsPlugin = {
       const y = h * (1 - (v - my) / ry);
       if (y > 5 && y < h - m.bottom - 5) {
         ctx.moveTo(m.left, y);
-        ctx.lineTo(w, y);
+        ctx.lineTo(plotRight, y);
       }
     });
     niceTicks(mx, mx + rx, 8).forEach((v) => {
       const x = w * ((v - mx) / rx);
-      if (x > m.left && x < w) {
+      if (x > m.left && x < plotRight) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, h - m.bottom);
       }
@@ -777,23 +971,46 @@ var labelsPlugin = {
       labelSize = DEFAULT_LABEL_SIZE
     } = chart.config;
     const drawFade = (dir, x, y, fw, fh) => {
-      const g = dir === "left" ? ctx.createLinearGradient(x, 0, x + fw, 0) : ctx.createLinearGradient(0, y, 0, y + fh);
+      const g = dir === "bottom" ? ctx.createLinearGradient(0, y, 0, y + fh) : ctx.createLinearGradient(x, 0, x + fw, 0);
       const alphas = dir === "left" ? [1, 0.7, 0.2, 0.05, 0] : [0, 0.05, 0.2, 0.7, 1];
       [0, 0.35, 0.55, 0.7, 1].forEach((s, i) => g.addColorStop(s, `rgba(${bg},${alphas[i]})`));
       ctx.fillStyle = g;
       ctx.fillRect(x, y, fw, fh);
     };
     drawFade("left", 0, 0, m.left + 20, h);
+    if (hasRightAxes(chart))
+      drawFade("right", w - m.right - 20, 0, m.right + 20, h);
     drawFade("bottom", 0, h - m.bottom - 20, w, m.bottom + 20);
     ctx.font = `${labelSize}px ${font}`;
-    ctx.fillStyle = text;
-    ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    niceTicks(my, my + ry, 7).forEach((v) => {
-      const y = h * (1 - (v - my) / ry);
-      if (y > 5 && y < h - m.bottom - 5)
-        ctx.fillText(formatY(v), m.left - 5, y);
-    });
+    const strips = yAxisStrips(chart, m, w);
+    if (!strips) {
+      ctx.fillStyle = text;
+      ctx.textAlign = "right";
+      niceTicks(my, my + ry, 7).forEach((v) => {
+        const y = h * (1 - (v - my) / ry);
+        if (y > 5 && y < h - m.bottom - 5)
+          ctx.fillText(formatY(v), m.left - 5, y);
+      });
+    } else {
+      for (const strip of strips) {
+        const scale = strip.axis?.scale ?? 1;
+        const offset = strip.axis?.offset ?? 0;
+        const fmt = strip.format ?? formatY;
+        // Visible primary-space window my..my+ry mapped into this axis' units.
+        const aMin = (my - offset) / scale;
+        const aMax = (my + ry - offset) / scale;
+        ctx.fillStyle = strip.color ?? text;
+        ctx.textAlign = strip.side === "right" ? "left" : "right";
+        const tx = strip.side === "right" ? strip.x0 + 5 : strip.x1 - 5;
+        niceTicks(aMin, aMax, 7).forEach((v) => {
+          const y = h * (1 - (v * scale + offset - my) / ry);
+          if (y > 5 && y < h - m.bottom - 5)
+            ctx.fillText(fmt(v), tx, y);
+        });
+      }
+    }
+    ctx.fillStyle = text;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
     niceTicks(mx, mx + rx, 8).forEach((v) => {
@@ -864,7 +1081,7 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
     if (lo > 0 && Math.abs(sr2.rawX[lo - 1] - dataX) < Math.abs(sr2.rawX[lo] - dataX))
       idx = lo - 1;
     const dx = Math.abs(sr2.rawX[idx] - dataX);
-    const dy = Math.abs(sr2.rawY[idx] - dataY);
+    const dy = Math.abs((sr2.plotY ?? sr2.rawY)[idx] - dataY);
     if (dx < bdx || dx === bdx && dy < bdy) {
       bdx = dx;
       bdy = dy;
@@ -879,7 +1096,8 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
     return null;
   return {
     x: sr.rawX[bi],
-    y: sr.rawY[bi],
+    y: (sr.plotY ?? sr.rawY)[bi],
+    value: sr.rawY[bi],
     index: bi,
     screenX,
     screenY,
@@ -957,7 +1175,7 @@ var hoverPlugin = {
     const { hoverResult: hvr } = s;
     const w = chart.width;
     const h = chart.height;
-    const margin = MARGIN;
+    const margin = chartMargin(chart);
     const dark = ChartManager.isDark;
     const {
       formatX = String,
@@ -989,7 +1207,7 @@ var hoverPlugin = {
         if (Math.abs(ser.rawX[m] - hvr.x) < 0.0001)
           return {
             label: ser.label,
-            val: formatY(ser.rawY[m]),
+            val: seriesAxisFormat(chart, si)(ser.rawY[m]),
             rawVal: ser.rawY[m],
             col: `rgb(${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)})`
           };
@@ -1007,7 +1225,7 @@ var hoverPlugin = {
       s.pillX = px;
       s.pillY = py;
     }
-    const drawPill = (x, y, txt, isX) => {
+    const drawPill = (x, y, txt, isX, anchorLeft) => {
       ctx.font = `600 10px ${fontFamily}`;
       const tw = ctx.measureText(txt).width, pw = tw + 12, ph = 18;
       const ox = isX ? x - pw / 2 : x - pw, oy = isX ? y : y - ph / 2;
@@ -1015,7 +1233,7 @@ var hoverPlugin = {
       const angle = isX ? Math.atan((s.pillTargetX - s.pillX) / 80) * 0.2 : Math.atan((s.pillTargetY - s.pillY) / 80) * 0.2;
       ctx.translate(x, y);
       ctx.rotate(angle);
-      const bx2 = isX ? -pw / 2 : -pw, by2 = isX ? 0 : -ph / 2;
+      const bx2 = isX ? -pw / 2 : anchorLeft ? 0 : -pw, by2 = isX ? 0 : -ph / 2;
       ctx.beginPath();
       ctx.roundRect(bx2, by2, pw, ph, 4);
       ctx.fillStyle = dark ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.75)";
@@ -1032,7 +1250,13 @@ var hoverPlugin = {
       ctx.restore();
     };
     drawPill(Math.max(margin.left, Math.min(w - margin.right, s.pillX)), h - margin.bottom + 4, formatX(hvr.x), true);
-    drawPill(margin.left, Math.max(9, Math.min(h - margin.bottom - 9, s.pillY)), formatY(hvr.y), false);
+    const hoveredAxis = chart.yAxes?.[chart.series[hvr.seriesIndex]?.axisIndex ?? 0];
+    const pillLabel = seriesAxisFormat(chart, hvr.seriesIndex)(hvr.value ?? hvr.y);
+    const pillY = Math.max(9, Math.min(h - margin.bottom - 9, s.pillY));
+    if (hoveredAxis?.side === "right")
+      drawPill(w - margin.right, pillY, pillLabel, false, true);
+    else
+      drawPill(margin.left, pillY, pillLabel, false);
     const boxW = Math.max(...displayData.map((d) => ctx.measureText(d.label + d.val).width)) + 40;
     const boxH = 30 + displayData.length * 18 + (remainingCount > 0 ? 18 : 0);
     let bx = hvr.screenX + 14, by = hvr.screenY - boxH - 6;
@@ -1080,7 +1304,7 @@ var niceTicks2 = (min, max, count) => {
   return ticks;
 };
 var getViewState2 = (chart) => {
-  const { width: w, height: h } = chart, m = MARGIN;
+  const { width: w, height: h } = chart, m = chartMargin(chart);
   const { bounds: b, view: v } = chart, fullX = b.maxX - b.minX, fullY = b.maxY - b.minY;
   const rx = fullX / v.zoomX, ry = fullY / v.zoomY;
   const mx = b.minX + v.panX * fullX, my = b.minY + v.panY * fullY;
@@ -1589,8 +1813,8 @@ function zoomPlugin(opts = {}) {
                         const rect = el.getBoundingClientRect();
                         const localX = e.clientX - rect.left;
                         const localY = e.clientY - rect.top;
-                        const margin = MARGIN;
-                        const overYAxis = localX < margin.left;
+                        const margin = chartMargin(chart);
+                        const overYAxis = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
                         const overXAxis = localY > rect.height - margin.bottom;
                         if (overYAxis && !overXAxis) {
                             edgeScaleMode = "y";
@@ -1764,8 +1988,8 @@ function zoomPlugin(opts = {}) {
                 const mx = localX / rect.width;
                 const my = 1 - localY / rect.height;
                 const scale = 1 - e.deltaY * 0.002;
-                const margin = MARGIN;
-                const overYAxis = localX < margin.left;
+                const margin = chartMargin(chart);
+                const overYAxis = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
                 const overXAxis = localY > rect.height - margin.bottom;
                 let zoomX;
                 let zoomY;
@@ -4680,7 +4904,7 @@ var annotationsPlugin = {
   beforeDraw(ctx, chart) {
     const annotations = chart.config.annotations ?? [];
     const { width: w, height: h } = chart;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const dark = ChartManager.isDark;
     const fontFamily = chart.config.fontFamily ?? DEFAULT_FONT;
     const regions = annotations.filter((a) => a.type === "hregion" || a.type === "vregion");
@@ -4743,7 +4967,7 @@ var annotationsPlugin = {
   afterDraw(ctx, chart) {
     const annotations = chart.config.annotations ?? [];
     const { width: w, height: h } = chart;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const dark = ChartManager.isDark;
     const fontFamily = chart.config.fontFamily ?? DEFAULT_FONT;
     const lines = annotations.filter((a) => a.type === "hline" || a.type === "vline");
@@ -4837,7 +5061,7 @@ var crosshairPlugin = {
     if (!showX && !showY)
       return;
     const { width: w, height: h } = chart;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const dark = ChartManager.isDark;
     const color = cfg.crosshairColor ?? (dark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.3)");
     const dash = cfg.crosshairDash ?? [4, 3];
@@ -4871,9 +5095,9 @@ var crosshairPlugin = {
 };
 // src/plugins/experimental/minimap.ts
 var states4 = new WeakMap;
-function getMinimapOrigin(pos, mSize, cw, ch) {
+function getMinimapOrigin(pos, mSize, cw, ch, chart) {
   const pad = 8;
-  const m = MARGIN;
+  const m = chart ? chartMargin(chart) : MARGIN;
   switch (pos) {
     case "top-left":
       return { mx: m.left + pad, my: m.top + pad };
@@ -4900,7 +5124,7 @@ var minimapPlugin = {
       const scaleY = ch / r.height;
       const cx = (e.clientX - r.left) * scaleX;
       const cy = (e.clientY - r.top) * scaleY;
-      const { mx, my } = getMinimapOrigin(pos, mSize, cw, ch);
+      const { mx, my } = getMinimapOrigin(pos, mSize, cw, ch, chart);
       return { cx, cy, mx, my, mSize };
     };
     el.addEventListener("pointerdown", (e) => {
@@ -4985,7 +5209,7 @@ var minimapPlugin = {
     const pos = cfg.minimapPosition ?? "bottom-right";
     const { width: cw, height: ch } = chart;
     const dark = ChartManager.isDark;
-    const { mx, my } = getMinimapOrigin(pos, mSize, cw, ch);
+    const { mx, my } = getMinimapOrigin(pos, mSize, cw, ch, chart);
     const mw = mSize;
     const mh = mSize;
     const borderR = 6;
@@ -5014,9 +5238,10 @@ var minimapPlugin = {
       ctx.lineWidth = 1;
       ctx.beginPath();
       const step = Math.max(1, Math.floor(series.rawX.length / mw));
+      const plotY = series.plotY ?? series.rawY;
       for (let i = 0;i < series.rawX.length; i += step) {
         const px = mx + innerPad + (series.rawX[i] - b.minX) / rangeX * (mw - innerPad * 2);
-        const py = my + innerPad + (1 - (series.rawY[i] - b.minY) / rangeY) * (mh - innerPad * 2);
+        const py = my + innerPad + (1 - (plotY[i] - b.minY) / rangeY) * (mh - innerPad * 2);
         if (i === 0)
           ctx.moveTo(px, py);
         else
@@ -5069,9 +5294,10 @@ function drawMiniCanvas(chart, state) {
     ctx.lineWidth = 1;
     ctx.beginPath();
     const step = Math.max(1, Math.floor(series.rawX.length / w));
+    const plotY = series.plotY ?? series.rawY;
     for (let i = 0;i < series.rawX.length; i += step) {
       const sx = (series.rawX[i] - b.minX) / rangeX * w;
-      const sy = h - (series.rawY[i] - b.minY) / rangeY * h;
+      const sy = h - (plotY[i] - b.minY) / rangeY * h;
       if (i === 0)
         ctx.moveTo(sx, sy);
       else
@@ -5362,8 +5588,8 @@ function applyTheme(el, dark) {
     s.setProperty("--ruler-clear-color", "rgba(80,80,80,0.9)");
   }
 }
-function setWrapperPosition(el, pos = "bottom-right") {
-  const m = MARGIN;
+function setWrapperPosition(el, pos = "bottom-right", chart) {
+  const m = chart ? chartMargin(chart) : MARGIN;
   const pad = 8;
   el.style.removeProperty("top");
   el.style.removeProperty("bottom");
@@ -5485,7 +5711,7 @@ var rulerPlugin = {
     const dark = ChartManager.isDark;
     const wrapper = document.createElement("div");
     wrapper.className = "chart-ruler-wrapper";
-    setWrapperPosition(wrapper, cfg.rulerPosition);
+    setWrapperPosition(wrapper, cfg.rulerPosition, chart);
     applyTheme(wrapper, dark);
     const button = document.createElement("button");
     button.type = "button";
@@ -5636,7 +5862,7 @@ var rulerPlugin = {
     const formatX = cfg.formatX ?? String;
     const formatY = cfg.formatY ?? String;
     const fontFamily = cfg.fontFamily ?? DEFAULT_FONT;
-    setWrapperPosition(state.wrapper, cfg.rulerPosition);
+    setWrapperPosition(state.wrapper, cfg.rulerPosition, chart);
     applyTheme(state.wrapper, dark);
     if (state.active)
       state.button.dataset.active = "";
@@ -5723,7 +5949,7 @@ function updateOverlay(chart, state) {
   overlay.style.minWidth = "100px";
   overlay.style.userSelect = "none";
   if (!state.dragOffset) {
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const pad = 6;
     if (state.customPos) {
       overlay.style.top = `${state.customPos.y}px`;
@@ -5897,7 +6123,7 @@ var thresholdPlugin = {
       return;
     const w = chart.width;
     const h = chart.height;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     for (const threshold of thresholds) {
       if (!threshold.fillAbove && !threshold.fillBelow)
         continue;
@@ -5924,7 +6150,7 @@ var thresholdPlugin = {
       return;
     const w = chart.width;
     const h = chart.height;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const dark = ChartManager.isDark;
     const fontFamily = cfg.fontFamily ?? DEFAULT_FONT;
     for (const threshold of thresholds) {
@@ -5994,7 +6220,7 @@ function findNearestPin(chart, screenX, screenY, width, height) {
       idx = lo - 1;
     }
     const dx = Math.abs(sr2.rawX[idx] - dataX);
-    const dy = Math.abs(sr2.rawY[idx] - dataY);
+    const dy = Math.abs((sr2.plotY ?? sr2.rawY)[idx] - dataY);
     if (dx < bestDx || dx === bestDx && dy < bestDy) {
       bestDx = dx;
       bestDy = dy;
@@ -6005,12 +6231,14 @@ function findNearestPin(chart, screenX, screenY, width, height) {
   if (bestSi === -1)
     return null;
   const sr = chart.series[bestSi];
-  const { x: candidateSx, y: candidateSy } = dataToScreen(sr.rawX[bestIdx], sr.rawY[bestIdx], chart, width, height);
+  const plotY = sr.plotY ?? sr.rawY;
+  const { x: candidateSx, y: candidateSy } = dataToScreen(sr.rawX[bestIdx], plotY[bestIdx], chart, width, height);
   if (Math.hypot(candidateSx - screenX, candidateSy - screenY) > MAX_PIN_PX)
     return null;
   return {
     dataX: sr.rawX[bestIdx],
-    dataY: sr.rawY[bestIdx],
+    dataY: plotY[bestIdx],
+    value: sr.rawY[bestIdx],
     seriesIndex: bestSi,
     seriesLabel: sr.label,
     color: sr.color
@@ -6056,11 +6284,10 @@ var tooltipPinPlugin = {
       return;
     const w = chart.width;
     const h = chart.height;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const dark = ChartManager.isDark;
     const cfg = chart.config;
     const formatX = cfg.formatX ?? String;
-    const formatY = cfg.formatY ?? String;
     const fontFamily = cfg.fontFamily ?? DEFAULT_FONT;
     ctx.save();
     ctx.font = `500 10px ${fontFamily}`;
@@ -6085,7 +6312,7 @@ var tooltipPinPlugin = {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       const xLabel = formatX(pin.dataX);
-      const yLabel = `${pin.seriesLabel}: ${formatY(pin.dataY)}`;
+      const yLabel = `${pin.seriesLabel}: ${seriesAxisFormat(chart, pin.seriesIndex)(pin.value ?? pin.dataY)}`;
       ctx.font = `500 10px ${fontFamily}`;
       const cardW = Math.max(ctx.measureText(xLabel).width, ctx.measureText(yLabel).width) + 20;
       const cardH = 14 + 2 * 17;
@@ -6132,7 +6359,7 @@ var watermarkPlugin = {
     if (!text)
       return;
     const { width: w, height: h } = chart;
-    const m = MARGIN;
+    const m = chartMargin(chart);
     const chartW = w - m.left - m.right;
     const chartH = h - m.top - m.bottom;
     const position = cfg.watermarkPosition ?? "center";

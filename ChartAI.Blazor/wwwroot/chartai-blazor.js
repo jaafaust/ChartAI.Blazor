@@ -134,6 +134,17 @@ function resolveFormat(token) {
     return FORMATTERS[token] ?? undefined;
 }
 
+// Resolve the per-axis format tokens of a yAxes config array to functions.
+function resolveYAxes(yAxes) {
+    if (!Array.isArray(yAxes)) return yAxes;
+    return yAxes.map((ax) => {
+        const a = { ...ax };
+        const f = resolveFormat(a.format);
+        if (f) a.format = f; else delete a.format;
+        return a;
+    });
+}
+
 // Turn the serialized Blazor config into the shape manager.create expects.
 function buildConfig(container, config) {
     const cfg = { ...config };
@@ -144,6 +155,7 @@ function buildConfig(container, config) {
     const fy = resolveFormat(config.formatY);
     if (fx) cfg.formatX = fx; else delete cfg.formatX;
     if (fy) cfg.formatY = fy; else delete cfg.formatY;
+    if (config.yAxes) cfg.yAxes = resolveYAxes(config.yAxes);
 
     return cfg;
 }
@@ -198,6 +210,7 @@ export function configure(id, configPatch) {
     const fy = resolveFormat(configPatch.formatY);
     if (fx) patch.formatX = fx; else delete patch.formatX;
     if (fy) patch.formatY = fy; else delete patch.formatY;
+    if (configPatch.yAxes) patch.yAxes = resolveYAxes(configPatch.yAxes);
 
     chart.configure(patch);
 }

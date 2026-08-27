@@ -29,6 +29,15 @@ public class ChartSeries
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Hidden { get; set; }
 
+    /// <summary>
+    /// Id of the Y axis this series is plotted against (see
+    /// <see cref="ChartConfig.YAxes"/> / <see cref="YAxisConfig.Id"/>).
+    /// Null = the first (primary) axis.
+    /// </summary>
+    [JsonPropertyName("yAxis")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? YAxis { get; set; }
+
     // ─── Built-in extra channels ───────────────────────────────────────────
     [JsonPropertyName("open")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
