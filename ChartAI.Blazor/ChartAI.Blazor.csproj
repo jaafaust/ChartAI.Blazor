@@ -6,6 +6,42 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- NuGet package metadata -->
+  <PropertyGroup>
+    <!-- PackageId also defines the static asset base path (_content/ChartAI.Blazor/...)
+         that Chart.razor.cs imports from. Do not change it without updating that path. -->
+    <PackageId>ChartAI.Blazor</PackageId>
+    <!-- Overridden by the release workflow from the git tag (v1.2.3 -> 1.2.3). -->
+    <Version>1.0.0</Version>
+    <Authors>jaafaust</Authors>
+    <Title>ChartAI for Blazor</Title>
+    <Description>Blazor component wrapping the chartai WebGPU charting engine: GPU-rendered line, area, scatter, bar, candlestick, OHLC, step, histogram, heatmap, bubble, baseline-area, error-band and waterfall charts with zoom, tooltips, legends, annotations, thresholds, multiple Y axes and interactive plugins (crosshair, ruler, minimap, range selector, stats, tooltip pin).</Description>
+    <PackageTags>blazor;chart;charts;charting;webgpu;gpu;visualization;plot;razor;wasm;chartai</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/jaafaust/ChartAI.Blazor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jaafaust/ChartAI.Blazor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>See https://github.com/jaafaust/ChartAI.Blazor/blob/master/CHANGELOG.md</PackageReleaseNotes>
+    <Copyright>Copyright (c) 2026 jaafaust</Copyright>
+  </PropertyGroup>
+
+  <!-- Build / symbols / Source Link -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Many public config members are self-describing; do not warn on missing XML docs. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <SupportedPlatform Include="browser" />
