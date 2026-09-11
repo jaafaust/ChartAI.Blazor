@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+- Error-band, area and baseline-area fills showed a darker vertical seam at every sample once the view was zoomed in far enough for the samples to be sparser than the pixels: the column holding a sample placed its vertex at the pixel centre while the empty columns around it collapsed onto the sample, so the fill strip folded over itself and blended twice.
+
 ## [1.1.0] - 2026-09-11
 
 ### Added

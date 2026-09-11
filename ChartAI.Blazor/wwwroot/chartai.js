@@ -2583,7 +2583,11 @@ if (dataMaxY < dataMinY) {
 lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
 return;
 }
-let normX = (centerX - u.viewMinX) / viewRangeX;
+// The vertex of a column that holds samples sits at the middle of those samples, not at the
+// pixel centre: the empty columns on either side collapse onto their nearest sample, so a
+// vertex left or right of that sample folds the strip back over itself and the overlap
+// shows as a darker seam wherever the fill is blended.
+let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
 let screenX = normX;
 let normMaxY = (dataMaxY - u.viewMinY) / viewRangeY;
 let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
@@ -4852,7 +4856,11 @@ if (dataMaxHi < dataMinLo) {
 dataMinLo = dataMinY;
 dataMaxHi = dataMaxY;
 }
-let normX = (centerX - u.viewMinX) / viewRangeX;
+// The vertex of a column that holds samples sits at the middle of those samples, not at the
+// pixel centre: the empty columns on either side collapse onto their nearest sample, so a
+// vertex left or right of that sample folds the strip back over itself and the overlap
+// shows as a darker seam wherever the fill is blended.
+let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
 let normMinLo = (dataMinLo - u.viewMinY) / viewRangeY;
 let normMaxHi = (dataMaxHi - u.viewMinY) / viewRangeY;
 let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
