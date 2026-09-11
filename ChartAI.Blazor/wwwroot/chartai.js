@@ -908,24 +908,16 @@ class _ChartManager {
       zoomY: chart.view.zoomY
     });
   }
+  // Linked charts share the x axis only: the window is one thing, the scale of each plot its
+  // own. Copying the whole view put every plot on the source's y pan and zoom as well, so a y
+  // zoom on one plot rescaled the others in units that were not theirs.
   syncAllViews(source) {
-    const transforms = [];
     for (const chart of this.charts.values()) {
       if (chart.id !== source.id) {
-        chart.view = { ...source.view };
-        transforms.push({ id: chart.id });
+        chart.view = { ...chart.view, panX: source.view.panX, zoomX: source.view.zoomX };
+        this.sendViewTransform(chart);
         this.drawChart(chart);
       }
-    }
-    if (transforms.length > 0) {
-      this.worker?.postMessage({
-        type: M.BATCH_VIEW_TRANSFORM,
-        panX: source.view.panX,
-        panY: source.view.panY,
-        zoomX: source.view.zoomX,
-        zoomY: source.view.zoomY,
-        transforms
-      });
     }
   }
   drawChart(chart) {
