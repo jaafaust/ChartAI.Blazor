@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-09-11
+
+### Changed
+- `setSyncViews` takes the axes linked charts share: `true` or `"both"` (the default, and the behaviour before 1.1.3), `"x"` or `"y"`. 1.1.3 had made the x axis the only thing shared; that is now the `"x"` mode.
+
 ## [1.1.3] - 2026-09-11
 
 ### Changed
