@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-11
+
+### Changed
+- Linked views (`setSyncViews`) share only the x axis. Copying the whole view put every chart on the source's y pan and zoom too, so a y zoom on one chart rescaled the others in units that were not theirs.
+
 ## [1.1.2] - 2026-09-11
 
 ### Added
