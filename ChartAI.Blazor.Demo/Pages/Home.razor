@@ -76,7 +76,7 @@
 
     <div class="section">
         <h2 class="section-title">Live Data Updates</h2>
-        <p class="section-description">Real-time data streaming at configurable speeds</p>
+        <p class="section-description">Real-time appends through PatchDataAsync: each tick sends one column and the engine writes it into the existing GPU buffers in place. Drag or zoom the first chart to see ViewChanged report the visible range</p>
         <div class="section-controls">
             <div class="control-item">
                 <label>Update Speed</label>
@@ -94,12 +94,12 @@
                     <span class="toggle-label">Accumulate</span>
                 </label>
             </div>
-            <div class="stats-display">Points: @_liveDataX.Count (@(_liveAccumulate ? "Accumulate" : "Ring Buffer"))</div>
+            <div class="stats-display">Points: @_liveDataX.Count (@(_liveAccumulate ? "Accumulate" : "Ring Buffer"))@(_liveViewInfo is null ? null : " · " + _liveViewInfo)</div>
         </div>
         <div class="chart-row">
-            <ChartCard @ref="_liveLine" Label="Live Line" Info="Streaming" Config="LiveCfg()" Series="LiveSeries(1)" />
-            <ChartCard @ref="_liveScatter" Label="Live Scatter" Info="Streaming" Config="LiveCfg(ChartType.Scatter)" Series="LiveSeries(2)" />
-            <ChartCard @ref="_liveLine2" Label="Live Line 2" Info="Streaming" Config="LiveCfg()" Series="LiveSeries(3)" />
+            <ChartCard @ref="_liveLine" Label="Live Line" Info="PatchData · ViewChanged" Config="LiveCfg()" Series="LiveSeries(1)" ViewChanged="OnLiveViewChanged" />
+            <ChartCard @ref="_liveScatter" Label="Live Scatter" Info="PatchData" Config="LiveCfg(ChartType.Scatter)" Series="LiveSeries(2)" />
+            <ChartCard @ref="_liveLine2" Label="Live Line 2" Info="PatchData" Config="LiveCfg()" Series="LiveSeries(3)" />
         </div>
     </div>
 

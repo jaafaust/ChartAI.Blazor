@@ -35,7 +35,7 @@ var p=array<vec2f,4>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(1,1));
 var u=array<vec2f,4>(vec2f(0,1),vec2f(1,1),vec2f(0,0),vec2f(1,0));
 return BV(vec4f(p[i],0,1),u[i]);}
 @fragment fn fs(v:BV)->@location(0)vec4f{return laaa(v.uv,inputTex,samp);}
-\`;var T={INIT:0,THEME:1,REGISTER_RENDERER:2,REGISTER_CHART:3,UNREGISTER_CHART:4,UPDATE_SERIES:5,RESIZE:6,VIEW_TRANSFORM:7,BATCH_VIEW_TRANSFORM:8,SET_VISIBILITY:9,SET_STYLE:10,SET_UNIFORMS:11,GPU_READY:12,ERROR:13,STATS:14},Q={NO_GPU:"e1:no-gpu",NO_ADAPTER:"e2:no-adapter",DEVICE_LOST:"e3:device-lost",NOT_READY:"e4:not-ready",COMPILE:"e5:compile",CTX_GET:"e6:ctx-get",CTX_CFG:"e7:ctx-cfg",TEX:"e8:tex",BIND_S:"e9:bind-s",BIND_C:"e10:bind-c",UPDATE:"e11:update",NO_RENDERER:"e12:no-renderer",RESIZE:"e13:resize"};var j,U,J=new Map,R=new Map,w=!1,I,B,l,P=0,M=0,C=!1,p=null,L=new ArrayBuffer(64),b=new Float32Array(L),n=new Uint32Array(L);function D(_){let O=GPUBufferUsage.COPY_DST;for(let N of _)switch(N.toUpperCase()){case"STORAGE":O|=GPUBufferUsage.STORAGE;break;case"VERTEX":O|=GPUBufferUsage.VERTEX;break;case"UNIFORM":O|=GPUBufferUsage.UNIFORM;break;case"COPY_SRC":O|=GPUBufferUsage.COPY_SRC;break;case"COPY_DST":O|=GPUBufferUsage.COPY_DST;break;case"INDEX":O|=GPUBufferUsage.INDEX;break;case"INDIRECT":O|=GPUBufferUsage.INDIRECT;break}return O}function i(_,O,N){let m=N==="compute"?GPUShaderStage.COMPUTE:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT;if(_==="uniforms"||_==="custom-uniforms"||_==="series-index")return{visibility:m,buffer:{type:"uniform"}};if(_==="render-target"){if(O)return{visibility:GPUShaderStage.COMPUTE,storageTexture:{access:"write-only",format:"rgba8unorm"}};return{visibility:m,texture:{sampleType:"float"}}}if(O)return{visibility:m,buffer:{type:"storage"}};return{visibility:m,buffer:{type:"read-only-storage"}}}function z(_,O,N,m,W){switch(_){case"uniforms":return{buffer:N.uniformBuffer};case"custom-uniforms":return{buffer:N.customUniformBuffer};case"series-info":return{buffer:N.seriesStorageBuffer};case"render-target":return N.outputTextureView;case"x-data":return{buffer:m.dataX};case"y-data":return{buffer:m.dataY};case"series-index":return{buffer:m.seriesIndexBuffer}}if(_.endsWith("-data")){let Y=_.slice(0,-5);return{buffer:m.extraBuffers.get(Y)}}if(W.config.bufferDefs.find((Y)=>Y.name===_)?.perSeries)return{buffer:m.seriesBuffers.get(_)};return{buffer:N.chartBuffers.get(_)}}function d(_){let O=new Map,N=new Map;for(let m=0;m<_.passes.length;m++){let W=_.passes[m],X=W.bindings.map((v)=>({binding:v.binding,...i(v.source,v.write,W.type)})),Y=j.createBindGroupLayout({entries:X});N.set(\`pass-\${m}\`,Y);let H=j.createPipelineLayout({bindGroupLayouts:[Y]}),G=j.createShaderModule({code:_.shaders[W.shader]});if(W.type==="compute")O.set(\`pass-\${m}\`,j.createComputePipeline({layout:H,compute:{module:G,entryPoint:"main"}}));else O.set(\`pass-\${m}\`,j.createRenderPipeline({layout:H,vertex:{module:G,entryPoint:"vs"},fragment:{module:G,entryPoint:"fs",targets:[{format:"rgba8unorm",blend:W.blend}]},primitive:{topology:W.topology??"triangle-list"}}))}return{config:_,pipelines:O,passLayouts:N}}function h(_){if(!_.seriesStorageBuffer||_.series.length===0)return;let O=new Float32Array(_.series.length*8),N=new Uint32Array(O.buffer);for(let m=0;m<_.series.length;m++){let W=_.series[m],X=m*8;O[X+0]=W.colorR,O[X+1]=W.colorG,O[X+2]=W.colorB,O[X+3]=1,N[X+4]=W.visibleStart,N[X+5]=W.visibleCount}j.queue.writeBuffer(_.seriesStorageBuffer,0,O)}function E(_,O){let N=b,m=n,W=_.maxX-_.minX,X=_.maxY-_.minY,Y=_.bgColor??(w?[0.11,0.11,0.12]:[0.98,0.98,0.98]);N[0]=_.width,N[1]=_.height,N[2]=_.minX+_.panX*W,N[3]=_.minX+_.panX*W+W/_.zoomX,N[4]=_.minY+_.panY*X,N[5]=_.minY+_.panY*X+X/_.zoomY,m[6]=O.pointCount,m[7]=_.series.length,m[8]=w?1:0,N[9]=Y[0],N[10]=Y[1],N[11]=Y[2],N[12]=_.minX,N[13]=_.maxX,N[14]=_.minY,N[15]=_.maxY,j.queue.writeBuffer(_.uniformBuffer,0,L)}function y(_,O){if(!_.customUniformBuffer||O.uniformDefs.length===0)return;let N=O.uniformDefs.length,m=Math.ceil(N*4/16)*16,W=new ArrayBuffer(m),X=new Float32Array(W),Y=new Uint32Array(W);for(let H=0;H<N;H++){let G=O.uniformDefs[H],v=_.customUniformValues[G.name]??G.default;if(G.type==="u32")Y[H]=v>>>0;else X[H]=v}j.queue.writeBuffer(_.customUniformBuffer,0,W)}function g(_,O,N){for(let[,m]of _.chartBuffers)m.destroy();_.chartBuffers.clear();for(let m of O.config.bufferDefs)if(!m.perSeries){let W=Math.max(16,N[m.name]??16);_.chartBuffers.set(m.name,j.createBuffer({size:W,usage:D(m.usages)}))}if(O.config.uniformDefs.length>0){if(_.customUniformBuffer)_.customUniformBuffer.destroy();let m=Math.max(16,Math.ceil(O.config.uniformDefs.length*4/16)*16);_.customUniformBuffer=j.createBuffer({size:m,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),y(_,O.config)}}function u(_,O,N,m){for(let[,W]of _.seriesBuffers)W.destroy();_.seriesBuffers.clear();for(let W of N.config.bufferDefs)if(W.perSeries){let X=Math.max(16,m[W.name]??16);_.seriesBuffers.set(W.name,j.createBuffer({size:X,usage:D(W.usages)}))}if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy();_.seriesIndexBuffer=j.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),j.queue.writeBuffer(_.seriesIndexBuffer,0,new Uint32Array([O,0,0,0]))}function f(_,O){if(!_.seriesStorageBuffer)return;for(let N=0;N<_.series.length;N++){let m=_.series[N];m.passBindGroups=[];for(let W=0;W<O.config.passes.length;W++){let X=O.config.passes[W];if(!X.perSeries){m.passBindGroups.push(null);continue}let Y=O.passLayouts.get(\`pass-\${W}\`);try{let H=X.bindings.map((G)=>({binding:G.binding,resource:z(G.source,G.write,_,m,O)}));m.passBindGroups.push(j.createBindGroup({layout:Y,entries:H}))}catch(H){postMessage({type:T.ERROR,code:Q.BIND_S}),m.passBindGroups.push(null)}}}_.chartPassBindGroups=[];for(let N=0;N<O.config.passes.length;N++){let m=O.config.passes[N];if(m.perSeries){_.chartPassBindGroups.push(null);continue}let W=O.passLayouts.get(\`pass-\${N}\`);try{let X=m.bindings.map((Y)=>({binding:Y.binding,resource:z(Y.source,Y.write,_,null,O)}));_.chartPassBindGroups.push(j.createBindGroup({layout:W,entries:X}))}catch(X){postMessage({type:T.ERROR,code:Q.BIND_C}),_.chartPassBindGroups.push(null)}}}function S(_){if(_.outputTexture)_.outputTexture.destroy();let O=Math.max(1,_.width),N=Math.max(1,_.height),m=R.get(_.rendererName),W=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT;if(m){for(let X of m.config.passes)if(X.type==="compute"){for(let Y of X.bindings)if(Y.source==="render-target"&&Y.write){W|=GPUTextureUsage.STORAGE_BINDING;break}}}_.outputTexture=j.createTexture({size:[O,N],format:"rgba8unorm",usage:W}),_.outputTextureView=_.outputTexture.createView(),_.blitBindGroup=j.createBindGroup({layout:B,entries:[{binding:0,resource:_.outputTextureView},{binding:1,resource:l}]})}function c(_){let O=R.get(_.rendererName);if(!O)return;if(!_.ctx||_.width===0||_.height===0||_.series.length===0)return;let N;try{N=_.ctx.getCurrentTexture().createView()}catch{return}let m=j.createCommandEncoder();if(h(_),_.series.length>0)E(_,_.series[0]);m.beginRenderPass({colorAttachments:[{view:_.outputTextureView,loadOp:"clear",storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}]}).end();for(let Y=0;Y<O.config.passes.length;Y++){let H=O.config.passes[Y],G=O.pipelines.get(\`pass-\${Y}\`);if(!G)continue;if(H.type==="compute")if(H.perSeries)for(let v=0;v<_.series.length;v++){let V=_.series[v];if(V.pointCount===0||V.hidden)continue;E(_,V);let q=_.perSeriesPassMeta[v]?.[Y]?.dispatch??{x:1},$=V.passBindGroups[Y];if(!$)continue;let Z=m.beginComputePass();Z.setPipeline(G),Z.setBindGroup(0,$),Z.dispatchWorkgroups(q.x,q.y??1,q.z??1),Z.end()}else{let v=_.chartPassBindGroups[Y];if(!v)continue;let K=_.perSeriesPassMeta[0]?.[Y]?.dispatch??{x:1},q=m.beginComputePass();q.setPipeline(G),q.setBindGroup(0,v),q.dispatchWorkgroups(K.x,K.y??1,K.z??1),q.end()}else if(H.type==="render"){let V=_.perSeriesPassMeta[0]?.[Y]?.draw??0,K=m.beginRenderPass({colorAttachments:[{view:_.outputTextureView,loadOp:H.loadOp??"load",storeOp:"store"}]});if(K.setPipeline(G),H.perSeries)for(let q=0;q<_.series.length;q++){let $=_.series[q];if($.pointCount===0||$.hidden)continue;let Z=$.passBindGroups[Y];if(!Z)continue;K.setBindGroup(0,Z),K.draw(V,1,0,q)}else{let q=_.chartPassBindGroups[Y];if(q)K.setBindGroup(0,q),K.draw(V,1,0,0)}K.end()}}let X=m.beginRenderPass({colorAttachments:[{view:N,loadOp:"clear",storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}]});if(X.setPipeline(I),_.blitBindGroup)X.setBindGroup(0,_.blitBindGroup);X.draw(4),X.end(),j.queue.submit([m.finish()])}function F(){if(!C)C=!0,requestAnimationFrame(t)}function A(_){if(_.dirty=!0,_.visible)F()}function s(){let _=!1;for(let O of J.values())if(O.dirty=!0,O.visible)_=!0;if(_)F()}function t(){C=!1;let _=performance.now();for(let O of J.values())if(O.visible&&O.dirty&&O.width>0)c(O),O.dirty=!1;M=performance.now()-_,P++}function e(){let _=0;for(let O of J.values())if(O.visible&&O.width>0)_++;return _}async function a(){if(j)return!0;if(!navigator.gpu)return postMessage({type:T.ERROR,code:Q.NO_GPU}),!1;let _=await navigator.gpu.requestAdapter();if(!_)return postMessage({type:T.ERROR,code:Q.NO_ADAPTER}),!1;j=await _.requestDevice({requiredLimits:{maxBufferSize:_.limits.maxBufferSize,maxStorageBufferBindingSize:_.limits.maxStorageBufferBindingSize}}),U=navigator.gpu.getPreferredCanvasFormat(),j.lost.then((N)=>{postMessage({type:T.ERROR,code:Q.DEVICE_LOST})}),B=j.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:"float"}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});let O=j.createShaderModule({code:k});return I=j.createRenderPipeline({layout:j.createPipelineLayout({bindGroupLayouts:[B]}),vertex:{module:O,entryPoint:"vs"},fragment:{module:O,entryPoint:"fs",targets:[{format:U}]},primitive:{topology:"triangle-strip"}}),l=j.createSampler({magFilter:"linear",minFilter:"linear"}),p=setInterval(()=>{postMessage({type:T.STATS,fps:P,renderMs:M,totalCharts:J.size,activeCharts:e()}),P=0},1000),postMessage({type:T.GPU_READY}),!0}function o(_){_.dataX.destroy(),_.dataY.destroy();for(let[,O]of _.extraBuffers)O.destroy();for(let[,O]of _.seriesBuffers)O.destroy();if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy()}function r(_,O,N,m,W){let X=J.get(_);if(!X||!j)return;let Y=R.get(X.rendererName);if(!Y){postMessage({type:T.ERROR,code:Q.NO_RENDERER});return}try{X.minX=N.minX,X.maxX=N.maxX,X.minY=N.minY,X.maxY=N.maxY,X.perSeriesPassMeta=W;for(let H of X.series)o(H);if(X.series=[],X.seriesStorageBuffer)X.seriesStorageBuffer.destroy();if(O.length>0)X.seriesStorageBuffer=j.createBuffer({size:Math.max(32,O.length*32),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});g(X,Y,m);for(let H=0;H<O.length;H++){let G=O[H],v=j.createBuffer({size:Math.max(16,G.dataX.byteLength),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),V=j.createBuffer({size:Math.max(16,G.dataY.byteLength),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});j.queue.writeBuffer(v,0,G.dataX),j.queue.writeBuffer(V,0,G.dataY);let K=new Map;for(let[$,Z]of Object.entries(G.extra??{})){let x=j.createBuffer({size:Math.max(16,Z.byteLength),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});j.queue.writeBuffer(x,0,Z),K.set($,x)}let q={label:G.label,colorR:G.colorR,colorG:G.colorG,colorB:G.colorB,dataX:v,dataY:V,extraBuffers:K,seriesBuffers:new Map,seriesIndexBuffer:null,pointCount:G.dataX.length,visibleStart:0,visibleCount:G.dataX.length,hidden:G.hidden??!1,passBindGroups:[]};X.series.push(q),u(q,H,Y,m)}f(X,Y)}catch(H){postMessage({type:T.ERROR,code:Q.UPDATE})}}self.onmessage=async(_)=>{let{type:O,...N}=_.data;switch(O){case T.INIT:w=N.isDark||!1,await a();break;case T.THEME:w=N.isDark,s();break;case T.REGISTER_RENDERER:{if(!j){postMessage({type:T.ERROR,code:Q.NOT_READY});break}let m={name:N.name,shaders:N.shaders,passes:N.passes,bufferDefs:N.bufferDefs??[],uniformDefs:N.uniformDefs??[]};try{R.set(N.name,d(m))}catch(W){postMessage({type:T.ERROR,code:Q.COMPILE})}break}case T.REGISTER_CHART:{if(!j)break;let m=N.canvas.getContext("webgpu");if(!m){postMessage({type:T.ERROR,code:Q.CTX_GET});break}try{m.configure({device:j,format:U,alphaMode:"premultiplied"})}catch(G){postMessage({type:T.ERROR,code:Q.CTX_CFG});break}let W=j.limits.maxTextureDimension2D,X=Math.min(Math.max(1,Math.floor(Number(N.canvas.width)||800)),W),Y=Math.min(Math.max(1,Math.floor(Number(N.canvas.height)||400)),W),H={id:N.id,canvas:N.canvas,ctx:m,rendererName:N.rendererName,visible:!0,series:[],uniformBuffer:j.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),seriesStorageBuffer:null,outputTexture:null,outputTextureView:null,blitBindGroup:null,chartBuffers:new Map,customUniformBuffer:null,customUniformValues:N.customUniformValues??{},chartPassBindGroups:[],perSeriesPassMeta:N.perSeriesPassMeta??[],width:X,height:Y,panX:0,panY:0,zoomX:1,zoomY:1,minX:0,maxX:1,maxY:1,minY:0,bgColor:N.bgColor??null,dirty:!0};try{S(H)}catch(G){postMessage({type:T.ERROR,code:Q.TEX});break}J.set(N.id,H);break}case T.UNREGISTER_CHART:{let m=J.get(N.id);if(m){try{m.ctx.unconfigure()}catch{}if(m.uniformBuffer.destroy(),m.seriesStorageBuffer)m.seriesStorageBuffer.destroy();if(m.outputTexture)m.outputTexture.destroy();if(m.customUniformBuffer)m.customUniformBuffer.destroy();for(let[,W]of m.chartBuffers)W.destroy();for(let W of m.series)o(W);J.delete(N.id)}break}case T.UPDATE_SERIES:{r(N.id,N.series,N.bounds,N.bufferSizes??{},N.perSeriesPassMeta??[]);let m=J.get(N.id);if(m)A(m);break}case T.RESIZE:{let m=J.get(N.id);if(!m||N.width<=0||N.height<=0)break;let W=j.limits.maxTextureDimension2D,X=Math.min(N.width,W),Y=Math.min(N.height,W);if(X===m.width&&Y===m.height)break;if(m.width=X,m.height=Y,m.canvas.width=X,m.canvas.height=Y,N.perSeriesPassMeta?.length>0)m.perSeriesPassMeta=N.perSeriesPassMeta;let H=R.get(m.rendererName);try{if(S(m),H&&N.bufferSizes){g(m,H,N.bufferSizes);for(let G=0;G<m.series.length;G++)u(m.series[G],G,H,N.bufferSizes);f(m,H)}}catch(G){postMessage({type:T.ERROR,code:Q.RESIZE})}A(m);break}case T.VIEW_TRANSFORM:{let m=J.get(N.id);if(m)m.panX=N.panX,m.panY=N.panY,m.zoomX=Math.max(0.1,Math.min(1e6,N.zoomX)),m.zoomY=Math.max(0.1,Math.min(1e6,N.zoomY)),A(m);break}case T.BATCH_VIEW_TRANSFORM:{let m=Math.max(0.1,Math.min(1e6,N.zoomX)),W=Math.max(0.1,Math.min(1e6,N.zoomY));for(let X of N.transforms){let Y=J.get(X.id);if(Y)Y.panX=N.panX,Y.panY=N.panY,Y.zoomX=m,Y.zoomY=W,Y.dirty=!0}F();break}case T.SET_VISIBILITY:{let m=J.get(N.id);if(m){if(m.visible=N.visible,N.visible&&m.dirty)F()}break}case T.SET_STYLE:{let m=J.get(N.id);if(m){if(N.bgColor!==void 0)m.bgColor=N.bgColor;if(N.hiddenSeries!==void 0)for(let W=0;W<m.series.length;W++)m.series[W].hidden=N.hiddenSeries.has(W);A(m)}break}case T.SET_UNIFORMS:{let m=J.get(N.id);if(!m)break;Object.assign(m.customUniformValues,N.values);let W=R.get(m.rendererName);if(W)y(m,W.config);A(m);break}}};
+\`;var T={INIT:0,THEME:1,REGISTER_RENDERER:2,REGISTER_CHART:3,UNREGISTER_CHART:4,UPDATE_SERIES:5,RESIZE:6,VIEW_TRANSFORM:7,BATCH_VIEW_TRANSFORM:8,SET_VISIBILITY:9,SET_STYLE:10,SET_UNIFORMS:11,GPU_READY:12,ERROR:13,STATS:14,PATCH_SERIES:15,SET_BOUNDS:16},Q={NO_GPU:"e1:no-gpu",NO_ADAPTER:"e2:no-adapter",DEVICE_LOST:"e3:device-lost",NOT_READY:"e4:not-ready",COMPILE:"e5:compile",CTX_GET:"e6:ctx-get",CTX_CFG:"e7:ctx-cfg",TEX:"e8:tex",BIND_S:"e9:bind-s",BIND_C:"e10:bind-c",UPDATE:"e11:update",NO_RENDERER:"e12:no-renderer",RESIZE:"e13:resize"};var j,U,J=new Map,R=new Map,w=!1,I,B,l,P=0,M=0,C=!1,p=null,L=new ArrayBuffer(80),b=new Float32Array(L),n=new Uint32Array(L);function D(_){let O=GPUBufferUsage.COPY_DST;for(let N of _)switch(N.toUpperCase()){case"STORAGE":O|=GPUBufferUsage.STORAGE;break;case"VERTEX":O|=GPUBufferUsage.VERTEX;break;case"UNIFORM":O|=GPUBufferUsage.UNIFORM;break;case"COPY_SRC":O|=GPUBufferUsage.COPY_SRC;break;case"COPY_DST":O|=GPUBufferUsage.COPY_DST;break;case"INDEX":O|=GPUBufferUsage.INDEX;break;case"INDIRECT":O|=GPUBufferUsage.INDIRECT;break}return O}function i(_,O,N){let m=N==="compute"?GPUShaderStage.COMPUTE:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT;if(_==="uniforms"||_==="custom-uniforms"||_==="series-index")return{visibility:m,buffer:{type:"uniform"}};if(_==="render-target"){if(O)return{visibility:GPUShaderStage.COMPUTE,storageTexture:{access:"write-only",format:"rgba8unorm"}};return{visibility:m,texture:{sampleType:"float"}}}if(O)return{visibility:m,buffer:{type:"storage"}};return{visibility:m,buffer:{type:"read-only-storage"}}}function z(_,O,N,m,W){switch(_){case"uniforms":return{buffer:N.uniformBuffer};case"custom-uniforms":return{buffer:N.customUniformBuffer};case"series-info":return{buffer:N.seriesStorageBuffer};case"render-target":return N.outputTextureView;case"x-data":return{buffer:m.dataX};case"y-data":return{buffer:m.dataY};case"series-index":return{buffer:m.seriesIndexBuffer}}if(_.endsWith("-data")){let Y=_.slice(0,-5);return{buffer:m.extraBuffers.get(Y)}}if(W.config.bufferDefs.find((Y)=>Y.name===_)?.perSeries)return{buffer:m.seriesBuffers.get(_)};return{buffer:N.chartBuffers.get(_)}}function d(_){let O=new Map,N=new Map,ms=!_.passes.some((v)=>v.type==="compute"&&v.bindings.some((b)=>b.source==="render-target"&&b.write));for(let m=0;m<_.passes.length;m++){let W=_.passes[m],X=W.bindings.map((v)=>({binding:v.binding,...i(v.source,v.write,W.type)})),Y=j.createBindGroupLayout({entries:X});N.set(\`pass-\${m}\`,Y);let H=j.createPipelineLayout({bindGroupLayouts:[Y]}),G=j.createShaderModule({code:_.shaders[W.shader]});if(W.type==="compute")O.set(\`pass-\${m}\`,j.createComputePipeline({layout:H,compute:{module:G,entryPoint:"main"}}));else O.set(\`pass-\${m}\`,j.createRenderPipeline({layout:H,vertex:{module:G,entryPoint:"vs"},fragment:{module:G,entryPoint:"fs",targets:[{format:"rgba8unorm",blend:W.blend}]},primitive:{topology:W.topology??"triangle-list"},multisample:{count:ms?4:1}}))}return{config:_,pipelines:O,passLayouts:N,msaa:ms,hl:_.passes.findIndex((v)=>v.highlight)}}function h(_){if(!_.seriesStorageBuffer||_.series.length===0)return;let O=new Float32Array(_.series.length*8),N=new Uint32Array(O.buffer);for(let m=0;m<_.series.length;m++){let W=_.series[m],X=m*8;O[X+0]=W.colorR,O[X+1]=W.colorG,O[X+2]=W.colorB,O[X+3]=1,N[X+4]=W.visibleStart,N[X+5]=W.visibleCount}j.queue.writeBuffer(_.seriesStorageBuffer,0,O)}function E(_,O){let N=b,m=n,W=_.maxX-_.minX,X=_.maxY-_.minY,Y=_.bgColor??(w?[0.11,0.11,0.12]:[0.98,0.98,0.98]);N[0]=_.width,N[1]=_.height,N[2]=_.minX+_.panX*W,N[3]=_.minX+_.panX*W+W/_.zoomX,N[4]=_.minY+_.panY*X,N[5]=_.minY+_.panY*X+X/_.zoomY,m[6]=O.pointCount,m[7]=_.series.length,m[8]=w?1:0,N[9]=Y[0],N[10]=Y[1],N[11]=Y[2],N[12]=_.minX,N[13]=_.maxX,N[14]=_.minY,N[15]=_.maxY,m[16]=(_.hlSeries??-1)>>>0,j.queue.writeBuffer(_.uniformBuffer,0,L)}function y(_,O){if(!_.customUniformBuffer||O.uniformDefs.length===0)return;let N=O.uniformDefs.length,m=Math.ceil(N*4/16)*16,W=new ArrayBuffer(m),X=new Float32Array(W),Y=new Uint32Array(W);for(let H=0;H<N;H++){let G=O.uniformDefs[H],v=_.customUniformValues[G.name]??G.default;if(G.type==="u32")Y[H]=v>>>0;else X[H]=v}j.queue.writeBuffer(_.customUniformBuffer,0,W)}function g(_,O,N){for(let[,m]of _.chartBuffers)m.destroy();_.chartBuffers.clear();for(let m of O.config.bufferDefs)if(!m.perSeries){let W=Math.max(16,N[m.name]??16);_.chartBuffers.set(m.name,j.createBuffer({size:W,usage:D(m.usages)}))}if(O.config.uniformDefs.length>0){if(_.customUniformBuffer)_.customUniformBuffer.destroy();let m=Math.max(16,Math.ceil(O.config.uniformDefs.length*4/16)*16);_.customUniformBuffer=j.createBuffer({size:m,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),y(_,O.config)}}function u(_,O,N,m){for(let[,W]of _.seriesBuffers)W.destroy();_.seriesBuffers.clear();for(let W of N.config.bufferDefs)if(W.perSeries){let X=Math.max(16,m[W.name]??16);_.seriesBuffers.set(W.name,j.createBuffer({size:X,usage:D(W.usages)}))}if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy();_.seriesIndexBuffer=j.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),j.queue.writeBuffer(_.seriesIndexBuffer,0,new Uint32Array([O,0,0,0]))}function f(_,O){if(!_.seriesStorageBuffer)return;for(let N=0;N<_.series.length;N++){let m=_.series[N];m.passBindGroups=[],m.hlBindGroup=null;for(let W=0;W<O.config.passes.length;W++){let X=O.config.passes[W];if(!X.perSeries||X.highlight){m.passBindGroups.push(null);continue}let Y=O.passLayouts.get(\`pass-\${W}\`);try{let H=X.bindings.map((G)=>({binding:G.binding,resource:z(G.source,G.write,_,m,O)}));m.passBindGroups.push(j.createBindGroup({layout:Y,entries:H}))}catch(H){postMessage({type:T.ERROR,code:Q.BIND_S,message:String(H)}),m.passBindGroups.push(null)}}}_.chartPassBindGroups=[];for(let N=0;N<O.config.passes.length;N++){let m=O.config.passes[N];if(m.perSeries){_.chartPassBindGroups.push(null);continue}let W=O.passLayouts.get(\`pass-\${N}\`);try{let X=m.bindings.map((Y)=>({binding:Y.binding,resource:z(Y.source,Y.write,_,null,O)}));_.chartPassBindGroups.push(j.createBindGroup({layout:W,entries:X}))}catch(X){postMessage({type:T.ERROR,code:Q.BIND_C,message:String(X)}),_.chartPassBindGroups.push(null)}}}function S(_){if(_.outputTexture)_.outputTexture.destroy();let O=Math.max(1,_.width),N=Math.max(1,_.height),m=R.get(_.rendererName),W=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT;if(m){for(let X of m.config.passes)if(X.type==="compute"){for(let Y of X.bindings)if(Y.source==="render-target"&&Y.write){W|=GPUTextureUsage.STORAGE_BINDING;break}}}_.outputTexture=j.createTexture({size:[O,N],format:"rgba8unorm",usage:W}),_.outputTextureView=_.outputTexture.createView(),_.blitBindGroup=j.createBindGroup({layout:B,entries:[{binding:0,resource:_.outputTextureView},{binding:1,resource:l}]});if(_.msaaTexture)_.msaaTexture.destroy(),_.msaaTexture=null,_.msaaView=null;if(m&&m.msaa)_.msaaTexture=j.createTexture({size:[O,N],format:"rgba8unorm",sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT}),_.msaaView=_.msaaTexture.createView()}function ca(_,O){return{view:_.msaaView??_.outputTextureView,resolveTarget:_.msaaView?_.outputTextureView:void 0,loadOp:O,storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}}function c(_){let O=R.get(_.rendererName);if(!O)return;if(!_.ctx||_.width===0||_.height===0||_.series.length===0)return;if(O.msaa&&!_.msaaView)S(_);let hs=_.highlight??-1;if(O.hl<0||hs<0||hs>=_.series.length||_.series[hs].hidden||_.series[hs].pointCount===0)hs=-1;_.hlSeries=hs;let N;try{N=_.ctx.getCurrentTexture().createView()}catch{return}let m=j.createCommandEncoder();if(h(_),_.series.length>0)E(_,_.series[0]);m.beginRenderPass({colorAttachments:[ca(_,"clear")]}).end();for(let Y=0;Y<O.config.passes.length;Y++){let H=O.config.passes[Y],G=O.pipelines.get(\`pass-\${Y}\`);if(!G||H.highlight)continue;if(H.type==="compute")if(H.perSeries)for(let v=0;v<_.series.length;v++){let V=_.series[v];if(V.pointCount===0||V.hidden)continue;E(_,V);let q=_.perSeriesPassMeta[v]?.[Y]?.dispatch??{x:1},$=V.passBindGroups[Y];if(!$)continue;let Z=m.beginComputePass();Z.setPipeline(G),Z.setBindGroup(0,$),Z.dispatchWorkgroups(q.x,q.y??1,q.z??1),Z.end()}else{let v=_.chartPassBindGroups[Y];if(!v)continue;let K=_.perSeriesPassMeta[0]?.[Y]?.dispatch??{x:1},q=m.beginComputePass();q.setPipeline(G),q.setBindGroup(0,v),q.dispatchWorkgroups(K.x,K.y??1,K.z??1),q.end()}else if(H.type==="render"){let V=_.perSeriesPassMeta[0]?.[Y]?.draw??0,K=m.beginRenderPass({colorAttachments:[ca(_,H.loadOp??"load")]});if(K.setPipeline(G),H.perSeries)for(let q=0;q<_.series.length;q++){let $=_.series[q];if($.pointCount===0||$.hidden)continue;let Z=$.passBindGroups[Y];if(!Z)continue;K.setBindGroup(0,Z),K.draw(V,1,0,q)}else{let q=_.chartPassBindGroups[Y];if(q)K.setBindGroup(0,q),K.draw(V,1,0,0)}K.end()}}if(hs>=0){let Y=O.hl,H=O.config.passes[Y],G=O.pipelines.get("pass-"+Y),V=_.series[hs];if(G&&!V.hlBindGroup)try{V.hlBindGroup=j.createBindGroup({layout:O.passLayouts.get("pass-"+Y),entries:H.bindings.map((b)=>({binding:b.binding,resource:z(b.source,b.write,_,V,O)}))})}catch(e){postMessage({type:T.ERROR,code:Q.BIND_S,message:String(e)})}if(G&&V.hlBindGroup){let n=_.perSeriesPassMeta[hs]?.[Y]?.draw??0,K=m.beginRenderPass({colorAttachments:[ca(_,"load")]});K.setPipeline(G),K.setBindGroup(0,V.hlBindGroup),K.draw(n,1,0,hs),K.end()}}let X=m.beginRenderPass({colorAttachments:[{view:N,loadOp:"clear",storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}]});if(X.setPipeline(I),_.blitBindGroup)X.setBindGroup(0,_.blitBindGroup);X.draw(4),X.end(),j.queue.submit([m.finish()])}function F(){if(!C)C=!0,requestAnimationFrame(t)}function A(_){if(_.dirty=!0,_.visible)F()}function s(){let _=!1;for(let O of J.values())if(O.dirty=!0,O.visible)_=!0;if(_)F()}function t(){C=!1;let _=performance.now();for(let O of J.values())if(O.visible&&O.dirty&&O.width>0)c(O),O.dirty=!1;M=performance.now()-_,P++}function e(){let _=0;for(let O of J.values())if(O.visible&&O.width>0)_++;return _}async function a(){if(j)return!0;if(!navigator.gpu)return postMessage({type:T.ERROR,code:Q.NO_GPU}),!1;let _=await navigator.gpu.requestAdapter();if(!_)return postMessage({type:T.ERROR,code:Q.NO_ADAPTER}),!1;j=await _.requestDevice({requiredLimits:{maxBufferSize:_.limits.maxBufferSize,maxStorageBufferBindingSize:_.limits.maxStorageBufferBindingSize}}),U=navigator.gpu.getPreferredCanvasFormat(),j.lost.then((N)=>{postMessage({type:T.ERROR,code:Q.DEVICE_LOST})}),B=j.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:"float"}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});let O=j.createShaderModule({code:k});return I=j.createRenderPipeline({layout:j.createPipelineLayout({bindGroupLayouts:[B]}),vertex:{module:O,entryPoint:"vs"},fragment:{module:O,entryPoint:"fs",targets:[{format:U}]},primitive:{topology:"triangle-strip"}}),l=j.createSampler({magFilter:"linear",minFilter:"linear"}),p=setInterval(()=>{postMessage({type:T.STATS,fps:P,renderMs:M,totalCharts:J.size,activeCharts:e()}),P=0},1000),postMessage({type:T.GPU_READY}),!0}function o(_){if(_.ownsX!==!1)_.dataX.destroy();_.dataY.destroy();for(let[,O]of _.extraBuffers)O.destroy();for(let[,O]of _.seriesBuffers)O.destroy();if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy()}function r(_,O,N,m,W,cap,sx){let X=J.get(_);if(!X||!j)return;let Y=R.get(X.rendererName);if(!Y){postMessage({type:T.ERROR,code:Q.NO_RENDERER});return}try{X.minX=N.minX,X.maxX=N.maxX,X.minY=N.minY,X.maxY=N.maxY,X.perSeriesPassMeta=W;for(let H of X.series)o(H);if(X.sharedX)X.sharedX.destroy(),X.sharedX=null;if(X.series=[],X.seriesStorageBuffer)X.seriesStorageBuffer.destroy();if(O.length>0)X.seriesStorageBuffer=j.createBuffer({size:Math.max(32,O.length*32),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});g(X,Y,m);let US=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST,mk=(len)=>j.createBuffer({size:Math.max(16,Math.max(cap||0,len)*4),usage:US});if(sx)X.sharedX=mk(sx.length),j.queue.writeBuffer(X.sharedX,0,sx);X.capacity=Math.max(cap||0,sx?sx.length:0);for(let H=0;H<O.length;H++){let G=O[H],v;if(sx)v=X.sharedX;else v=mk(G.dataX.length),j.queue.writeBuffer(v,0,G.dataX);let V=mk(G.dataY.length);j.queue.writeBuffer(V,0,G.dataY);let K=new Map;for(let[$,Z]of Object.entries(G.extra??{})){let x=mk(Z.length);j.queue.writeBuffer(x,0,Z),K.set($,x)}let n=G.dataY.length,q={label:G.label,colorR:G.colorR,colorG:G.colorG,colorB:G.colorB,dataX:v,ownsX:!sx,dataY:V,extraBuffers:K,seriesBuffers:new Map,seriesIndexBuffer:null,pointCount:n,visibleStart:0,visibleCount:n,hidden:G.hidden??!1,passBindGroups:[]};X.series.push(q),u(q,H,Y,m)}f(X,Y)}catch(H){postMessage({type:T.ERROR,code:Q.UPDATE,message:String(H)})}}self.onmessage=async(_)=>{let{type:O,...N}=_.data;switch(O){case T.INIT:w=N.isDark||!1,await a();break;case T.THEME:w=N.isDark,s();break;case T.REGISTER_RENDERER:{if(!j){postMessage({type:T.ERROR,code:Q.NOT_READY});break}let m={name:N.name,shaders:N.shaders,passes:N.passes,bufferDefs:N.bufferDefs??[],uniformDefs:N.uniformDefs??[]};try{R.set(N.name,d(m))}catch(W){postMessage({type:T.ERROR,code:Q.COMPILE})}break}case T.REGISTER_CHART:{if(!j)break;let m=N.canvas.getContext("webgpu");if(!m){postMessage({type:T.ERROR,code:Q.CTX_GET});break}try{m.configure({device:j,format:U,alphaMode:"premultiplied"})}catch(G){postMessage({type:T.ERROR,code:Q.CTX_CFG});break}let W=j.limits.maxTextureDimension2D,X=Math.min(Math.max(1,Math.floor(Number(N.canvas.width)||800)),W),Y=Math.min(Math.max(1,Math.floor(Number(N.canvas.height)||400)),W),H={id:N.id,canvas:N.canvas,ctx:m,rendererName:N.rendererName,visible:!0,series:[],uniformBuffer:j.createBuffer({size:80,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),seriesStorageBuffer:null,outputTexture:null,outputTextureView:null,msaaTexture:null,msaaView:null,blitBindGroup:null,chartBuffers:new Map,customUniformBuffer:null,customUniformValues:N.customUniformValues??{},chartPassBindGroups:[],perSeriesPassMeta:N.perSeriesPassMeta??[],width:X,height:Y,panX:0,panY:0,zoomX:1,zoomY:1,minX:0,maxX:1,maxY:1,minY:0,bgColor:N.bgColor??null,highlight:-1,dirty:!0};try{S(H)}catch(G){postMessage({type:T.ERROR,code:Q.TEX});break}J.set(N.id,H);break}case T.UNREGISTER_CHART:{let m=J.get(N.id);if(m){try{m.ctx.unconfigure()}catch{}if(m.uniformBuffer.destroy(),m.seriesStorageBuffer)m.seriesStorageBuffer.destroy();if(m.outputTexture)m.outputTexture.destroy();if(m.msaaTexture)m.msaaTexture.destroy();if(m.customUniformBuffer)m.customUniformBuffer.destroy();for(let[,W]of m.chartBuffers)W.destroy();for(let W of m.series)o(W);if(m.sharedX)m.sharedX.destroy();J.delete(N.id)}break}case T.UPDATE_SERIES:{r(N.id,N.series,N.bounds,N.bufferSizes??{},N.perSeriesPassMeta??[],N.capacity,N.sharedX);let m=J.get(N.id);if(m)A(m);break}case T.PATCH_SERIES:{let m=J.get(N.id);if(!m||!j)break;try{let off=N.offset|0,k=N.k|0,S=m.series.length,P=N.packed,ex=N.extra||[];if(N.bounds)m.minX=N.bounds.minX,m.maxX=N.bounds.maxX,m.minY=N.bounds.minY,m.maxY=N.bounds.maxY;if(N.x&&k>0){if(m.sharedX)j.queue.writeBuffer(m.sharedX,off*4,N.x);else for(let s of m.series)j.queue.writeBuffer(s.dataX,off*4,N.x)}if(P&&k>0)for(let i=0;i<S;i++){let s=m.series[i];j.queue.writeBuffer(s.dataY,off*4,P,i*k,k);for(let e=0;e<ex.length;e++){let b=s.extraBuffers.get(ex[e]);if(b)j.queue.writeBuffer(b,off*4,P,((e+1)*S+i)*k,k)}}for(let s of m.series)s.pointCount=N.count,s.visibleCount=N.count}catch(H){postMessage({type:T.ERROR,code:Q.UPDATE,message:String(H)})}A(m);break}case T.SET_BOUNDS:{let m=J.get(N.id);if(m)m.minX=N.bounds.minX,m.maxX=N.bounds.maxX,m.minY=N.bounds.minY,m.maxY=N.bounds.maxY,A(m);break}case T.RESIZE:{let m=J.get(N.id);if(!m||N.width<=0||N.height<=0)break;let W=j.limits.maxTextureDimension2D,X=Math.min(N.width,W),Y=Math.min(N.height,W);if(X===m.width&&Y===m.height)break;if(m.width=X,m.height=Y,m.canvas.width=X,m.canvas.height=Y,N.perSeriesPassMeta?.length>0)m.perSeriesPassMeta=N.perSeriesPassMeta;let H=R.get(m.rendererName);try{if(S(m),H&&N.bufferSizes){g(m,H,N.bufferSizes);for(let G=0;G<m.series.length;G++)u(m.series[G],G,H,N.bufferSizes);f(m,H)}}catch(G){postMessage({type:T.ERROR,code:Q.RESIZE,message:String(G)})}A(m);break}case T.VIEW_TRANSFORM:{let m=J.get(N.id);if(m)m.panX=N.panX,m.panY=N.panY,m.zoomX=Math.max(0.1,Math.min(1e6,N.zoomX)),m.zoomY=Math.max(0.1,Math.min(1e6,N.zoomY)),A(m);break}case T.BATCH_VIEW_TRANSFORM:{let m=Math.max(0.1,Math.min(1e6,N.zoomX)),W=Math.max(0.1,Math.min(1e6,N.zoomY));for(let X of N.transforms){let Y=J.get(X.id);if(Y)Y.panX=N.panX,Y.panY=N.panY,Y.zoomX=m,Y.zoomY=W,Y.dirty=!0}F();break}case T.SET_VISIBILITY:{let m=J.get(N.id);if(m){if(m.visible=N.visible,N.visible&&m.dirty)F()}break}case T.SET_STYLE:{let m=J.get(N.id);if(m){if(N.bgColor!==void 0)m.bgColor=N.bgColor;if(N.highlightSeries!==void 0)m.highlight=N.highlightSeries;if(N.hiddenSeries!==void 0)for(let W=0;W<m.series.length;W++)m.series[W].hidden=N.hiddenSeries.has(W);A(m)}break}case T.SET_UNIFORMS:{let m=J.get(N.id);if(!m)break;Object.assign(m.customUniformValues,N.values);let W=R.get(m.rendererName);if(W)y(m,W.config);A(m);break}}};
 `;
 
 // src/msg.ts
@@ -54,7 +54,9 @@ var M = {
   SET_UNIFORMS: 11,
   GPU_READY: 12,
   ERROR: 13,
-  STATS: 14
+  STATS: 14,
+  PATCH_SERIES: 15,
+  SET_BOUNDS: 16
 };
 
 // src/chart-library.ts
@@ -68,8 +70,15 @@ class Chart {
   get _c() {
     return this._mgr["charts"].get(this.id);
   }
-  setData(series) {
-    this._mgr.updateSeries(this.id, series);
+  setData(series, opts) {
+    this._mgr.updateSeries(this.id, series, opts);
+  }
+  // Follow-mode path: writes columns [offset, count) into the existing GPU buffers, see ChartManager.patchSeries.
+  patchData(patch) {
+    this._mgr.patchSeries(this.id, patch);
+  }
+  setBounds(bounds) {
+    this._mgr.setBounds(this.id, bounds);
   }
   configure(patch) {
     const c = this._c;
@@ -145,6 +154,43 @@ class Chart {
   destroy() {
     this._mgr.destroy(this.id);
   }
+}
+var GPU_GAP = -3e38;
+function isNumericArray(v) {
+  return Array.isArray(v) || ArrayBuffer.isView(v) && !(v instanceof DataView);
+}
+function isSortedAscending(x) {
+  for (let i = 1;i < x.length; i++)
+    if (!(x[i] >= x[i - 1]))
+      return false;
+  return true;
+}
+// A missing sample is null/NaN on the JS side and GPU_GAP on the GPU: NaN is not reliable in
+// WGSL, and Float32Array would silently turn null into 0.
+function toGpu(arr, scale = 1, offset = 0) {
+  const n = arr.length;
+  const out = new Float32Array(n);
+  for (let i = 0;i < n; i++) {
+    const v = arr[i];
+    out[i] = v == null || v !== v ? GPU_GAP : v * scale + offset;
+  }
+  return out;
+}
+function packInto(dst, dstOffset, src, srcOffset, k, scale = 1, offset = 0) {
+  for (let i = 0;i < k; i++) {
+    const v = src[srcOffset + i];
+    dst[dstOffset + i] = v == null || v !== v ? GPU_GAP : v * scale + offset;
+  }
+}
+// The affine remap of a secondary-axis series into primary-axis space; a gap stays a gap.
+function mapPlot(arr, scale, offset) {
+  const n = arr.length;
+  const out = new Float64Array(n);
+  for (let i = 0;i < n; i++) {
+    const v = arr[i];
+    out[i] = v == null || v !== v ? NaN : v * scale + offset;
+  }
+  return out;
 }
 var _colorEl = null;
 function parseColor(c) {
@@ -293,7 +339,7 @@ class _ChartManager {
           resolve(true);
           break;
         case M.ERROR:
-          console.error("chartai:", data.code);
+          console.error("chartai:", data.code, data.message ?? "");
           resolve(false);
           break;
         case M.STATS:
@@ -331,7 +377,8 @@ class _ChartManager {
         perSeries: p.perSeries !== false,
         topology: p.topology,
         loadOp: p.loadOp,
-        blend: p.blend
+        blend: p.blend,
+        highlight: p.highlight === true
       })),
       bufferDefs,
       uniformDefs: renderer.uniforms ?? []
@@ -356,7 +403,7 @@ class _ChartManager {
       const ctx = {
         width: physW,
         height: physH,
-        samples: s.rawX.length,
+        samples: Math.max(s.rawX.length, chart.capacity ?? 0),
         seriesCount: series.length,
         bounds: chart.bounds,
         view: chart.view
@@ -455,7 +502,7 @@ class _ChartManager {
     for (const plugin of chart.plugins)
       plugin.install?.(chart, wrap);
     renderer.install?.(chart, wrap);
-    this.updateSeries(id, config.series);
+    this.updateSeries(id, config.series, { capacity: config.capacity, bounds: config.defaultBounds });
     return new Chart(id, this);
   }
   destroy(id) {
@@ -473,7 +520,7 @@ class _ChartManager {
     this.worker?.postMessage({ type: M.UNREGISTER_CHART, id });
     this.charts.delete(id);
   }
-  updateSeries(id, series) {
+  updateSeries(id, series, opts = {}) {
     const chart = this.charts.get(id);
     if (!chart || !this.worker || series.length === 0)
       return;
@@ -485,30 +532,35 @@ class _ChartManager {
     chart.series = series.map((s) => {
       const n = s.x.length;
       const color = parseColor(s.color);
-      if (n === 0)
-        return { label: s.label, color, yAxis: s.yAxis, rawX: [], rawY: [], extra: {} };
-      const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => s.x[a] - s.x[b]);
+      // An empty series keeps its extra arrays (empty): the renderer's bind groups need every
+      // buffer to exist, and follow mode later patches columns into the capacity-sized buffers.
+      // Time series arrive sorted: keep them by reference and only sort the ones that are not.
+      const idx = isSortedAscending(s.x) ? null : Array.from({ length: n }, (_, i) => i).sort((a, b) => s.x[a] - s.x[b]);
+      const pick = (arr) => idx ? idx.map((i) => arr[i]) : arr;
       const extra = {};
       for (const key in s) {
-        if (key !== "label" && key !== "color" && key !== "x" && key !== "y" && Array.isArray(s[key])) {
-          extra[key] = idx.map((i) => s[key][i]);
+        if (key !== "label" && key !== "color" && key !== "x" && key !== "y" && isNumericArray(s[key])) {
+          extra[key] = pick(s[key]);
         }
       }
       return {
         label: s.label,
         color,
         yAxis: s.yAxis,
-        rawX: idx.map((i) => s.x[i]),
-        rawY: idx.map((i) => s.y[i]),
+        rawX: pick(s.x),
+        rawY: pick(s.y),
         extra
       };
     });
-    this.refreshSeriesData(chart);
+    if (opts.bounds)
+      chart.config.defaultBounds = { ...opts.bounds };
+    this.refreshSeriesData(chart, opts.capacity);
   }
   // Re-derive axes, bounds and GPU-space data from chart.series and push it to
   // the worker. Also called after axis-affecting config changes (yAxes, gap,
-  // defaultBounds), so those take effect without re-supplying the data.
-  refreshSeriesData(chart) {
+  // defaultBounds), so those take effect without re-supplying the data; the GPU
+  // buffers keep the capacity they have then.
+  refreshSeriesData(chart, capacity) {
     if (!this.worker || chart.series.length === 0)
       return;
     const axes = yAxisDefs(chart);
@@ -524,15 +576,24 @@ class _ChartManager {
         let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
         for (const s of chart.series) {
           for (let i = 0;i < s.rawX.length; i++) {
-            if (s.rawX[i] < minX2)
-              minX2 = s.rawX[i];
-            if (s.rawX[i] > maxX2)
-              maxX2 = s.rawX[i];
-            if (s.rawY[i] < minY2)
-              minY2 = s.rawY[i];
-            if (s.rawY[i] > maxY2)
-              maxY2 = s.rawY[i];
+            const x = s.rawX[i], y = s.rawY[i];
+            if (x < minX2)
+              minX2 = x;
+            if (x > maxX2)
+              maxX2 = x;
+            if (y != null && y < minY2)
+              minY2 = y;
+            if (y != null && y > maxY2)
+              maxY2 = y;
           }
+        }
+        if (!isFinite(minX2)) {
+          minX2 = 0;
+          maxX2 = 1;
+        }
+        if (!isFinite(minY2)) {
+          minY2 = 0;
+          maxY2 = 1;
         }
         const px = (maxX2 - minX2) * 0.05 || 1;
         const py = (maxY2 - minY2) * 0.1 || 1;
@@ -638,44 +699,140 @@ class _ChartManager {
       maxY = prim.max;
       for (const s of chart.series) {
         const ax = axes[s.axisIndex];
-        s.plotY = ax.scale === 1 && ax.offset === 0 ? s.rawY : s.rawY.map((v) => v * ax.scale + ax.offset);
+        s.plotY = ax.scale === 1 && ax.offset === 0 ? s.rawY : mapPlot(s.rawY, ax.scale, ax.offset);
       }
     }
     chart.bounds = { minX, maxX, minY, maxY };
+    // GPU buffers are sized to the capacity so patchSeries can append without recreating them;
+    // a refresh after a config change keeps the capacity the buffers already have.
+    let longest = 0;
+    for (const s of chart.series)
+      if (s.rawX.length > longest)
+        longest = s.rawX.length;
+    chart.capacity = Math.max(capacity ?? chart.capacity ?? 0, longest);
     const { bufferSizes, perSeriesPassMeta } = this.computeRendererMeta(chart.renderer, chart);
     const hidden = chart.config.hiddenSeries ?? new Set;
+    // Series sharing one x array by reference (a sampled trend) upload it once, bound to every series.
+    const sharedX = chart.series.every((s) => s.rawX === chart.series[0].rawX) ? chart.series[0].rawX : null;
+    const sharedXData = sharedX ? toGpu(sharedX) : null;
     const seriesData = chart.series.map((s, i) => {
       const ax = axes?.[s.axisIndex];
       const mapped = !!ax && (ax.scale !== 1 || ax.offset !== 0);
       const extra = {};
       for (const key in s.extra) {
-        const src = mapped && Y_PLOT_CHANNELS.has(key) ? s.extra[key].map((v) => v * ax.scale + ax.offset) : mapped && key === "h" ? s.extra[key].map((v) => v * ax.scale) : s.extra[key];
-        extra[key] = new Float32Array(src);
+        // Y-positional channels of a series on a secondary axis are remapped like its y; a
+        // bar height scales without the offset. Gaps stay gaps through the mapping.
+        const scale = mapped && (Y_PLOT_CHANNELS.has(key) || key === "h") ? ax.scale : 1;
+        const offset = mapped && Y_PLOT_CHANNELS.has(key) ? ax.offset : 0;
+        extra[key] = toGpu(s.extra[key], scale, offset);
       }
       return {
         label: s.label,
         colorR: s.color.r,
         colorG: s.color.g,
         colorB: s.color.b,
-        dataX: new Float32Array(s.rawX),
-        dataY: new Float32Array(s.plotY ?? s.rawY),
+        dataX: sharedXData ? null : toGpu(s.rawX),
+        dataY: toGpu(s.plotY ?? s.rawY),
         extra,
         hidden: hidden.has(i)
       };
     });
     const transferables = seriesData.flatMap((s) => [
-      s.dataX.buffer,
+      ...s.dataX ? [s.dataX.buffer] : [],
       s.dataY.buffer,
       ...Object.values(s.extra).map((a) => a.buffer)
     ]);
+    if (sharedXData)
+      transferables.push(sharedXData.buffer);
     this.worker.postMessage({
       type: M.UPDATE_SERIES,
       id: chart.id,
       series: seriesData,
       bounds: chart.bounds,
       bufferSizes,
-      perSeriesPassMeta
+      perSeriesPassMeta,
+      capacity: chart.capacity,
+      sharedX: sharedXData
     }, transferables);
+    this.sendViewTransform(chart);
+    this.drawChart(chart);
+  }
+  // Writes columns [offset, count) of every series into the GPU buffers updateSeries created
+  // (up to `capacity` columns per series) without recreating anything - follow mode's per-tick
+  // path. `series` carries each series' full arrays of length `count` (y plus the renderer's
+  // extra arrays such as lo/hi), which also become what the hover layer reads; `x` is the shared
+  // x array. All values of one tick travel in one packed transferable.
+  patchSeries(id, patch) {
+    const chart = this.charts.get(id);
+    if (!chart || !this.worker || chart.series.length === 0)
+      return;
+    const { offset, count, x, series, bounds } = patch;
+    const n = chart.series.length;
+    if (series.length !== n || count > chart.capacity || offset < 0 || offset > count)
+      throw new Error(`patchData: ${series.length} series with columns ${offset}..${count} do not fit a chart of ${n} series x ${chart.capacity} columns`);
+    const k = count - offset;
+    const extraKeys = Object.keys(chart.series[0].extra);
+    const axes = chart.yAxes;
+    for (let i = 0;i < n; i++) {
+      const s = chart.series[i], p = series[i];
+      s.rawX = x;
+      s.rawY = p.y;
+      for (const key of extraKeys)
+        if (p[key])
+          s.extra[key] = p[key];
+      // A series on a secondary axis is drawn in primary-axis space with the mapping of the last
+      // full update (see refreshSeriesData); the hover reads the same mapping.
+      const ax = axes?.[s.axisIndex];
+      s.plotY = ax && (ax.scale !== 1 || ax.offset !== 0) ? mapPlot(p.y, ax.scale, ax.offset) : p.y;
+    }
+    if (bounds) {
+      chart.config.defaultBounds = { ...bounds };
+      chart.bounds = { ...bounds };
+    }
+    let packed = null, xData = null;
+    const transferables = [];
+    if (k > 0) {
+      packed = new Float32Array((1 + extraKeys.length) * n * k);
+      for (let i = 0;i < n; i++) {
+        const p = series[i];
+        const ax = axes?.[chart.series[i].axisIndex];
+        const mapped = !!ax && (ax.scale !== 1 || ax.offset !== 0);
+        packInto(packed, i * k, p.y, offset, k, mapped ? ax.scale : 1, mapped ? ax.offset : 0);
+        for (let e = 0;e < extraKeys.length; e++) {
+          const key = extraKeys[e];
+          const scale = mapped && (Y_PLOT_CHANNELS.has(key) || key === "h") ? ax.scale : 1;
+          const off = mapped && Y_PLOT_CHANNELS.has(key) ? ax.offset : 0;
+          packInto(packed, ((e + 1) * n + i) * k, p[key], offset, k, scale, off);
+        }
+      }
+      transferables.push(packed.buffer);
+      if (x) {
+        xData = toGpu(x.subarray ? x.subarray(offset, count) : x.slice(offset, count));
+        transferables.push(xData.buffer);
+      }
+    }
+    this.worker.postMessage({
+      type: M.PATCH_SERIES,
+      id,
+      offset,
+      k,
+      count,
+      x: xData,
+      packed,
+      extra: extraKeys,
+      bounds: bounds ? chart.bounds : null
+    }, transferables);
+    this.sendViewTransform(chart);
+    this.drawChart(chart);
+  }
+  // Moves the data window without touching the data: follow mode's tick when nothing new arrived.
+  setBounds(id, bounds) {
+    const chart = this.charts.get(id);
+    if (!chart || !this.worker)
+      return;
+    chart.config.defaultBounds = { ...bounds };
+    chart.bounds = { ...bounds };
+    this.worker.postMessage({ type: M.SET_BOUNDS, id, bounds: chart.bounds });
     this.sendViewTransform(chart);
     this.drawChart(chart);
   }
@@ -884,8 +1041,9 @@ function computeHomeView(chart) {
   const { width, height } = chart;
   const m = chartMargin(chart);
   // Preserve the classic insets (l 32 / r 8 for MARGIN 55/10) while growing
-  // with the strips claimed by additional y-axes.
-  const l = Math.max(8, m.left - 23), t = 8, r = Math.max(8, m.right - 2), b = 48;
+  // with the strips claimed by additional y-axes. Without the margin fade the
+  // strips have a hard edge, so the data starts right at it instead of under it.
+  const l = chart.config.bgFade === false ? m.left : Math.max(8, m.left - 23), t = 8, r = Math.max(8, m.right - 2), b = 48;
   const innerW = width - l - r;
   const innerH = height - t - b;
   return {
@@ -977,10 +1135,21 @@ var labelsPlugin = {
       ctx.fillStyle = g;
       ctx.fillRect(x, y, fw, fh);
     };
-    drawFade("left", 0, 0, m.left + 20, h);
-    if (hasRightAxes(chart))
-      drawFade("right", w - m.right - 20, 0, m.right + 20, h);
-    drawFade("bottom", 0, h - m.bottom - 20, w, m.bottom + 20);
+    // The axis margins are painted in the background colour so the labels stay readable over
+    // data running under them: as a gradient reaching 20px into the plot, which fades the data
+    // out toward the borders (the default), or with bgFade off as plain strips with a hard edge.
+    if (chart.config.bgFade === false) {
+      ctx.fillStyle = `rgb(${bg})`;
+      ctx.fillRect(0, 0, m.left, h);
+      if (hasRightAxes(chart))
+        ctx.fillRect(w - m.right, 0, m.right, h);
+      ctx.fillRect(0, h - m.bottom, w, m.bottom);
+    } else {
+      drawFade("left", 0, 0, m.left + 20, h);
+      if (hasRightAxes(chart))
+        drawFade("right", w - m.right - 20, 0, m.right + 20, h);
+      drawFade("bottom", 0, h - m.bottom - 20, w, m.bottom + 20);
+    }
     ctx.font = `${labelSize}px ${font}`;
     ctx.textBaseline = "middle";
     const strips = yAxisStrips(chart, m, w);
@@ -1061,6 +1230,9 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
   const rX = chart.bounds.maxX - chart.bounds.minX;
   const vW = rX / chart.view.zoomX;
   const vMinX = chart.bounds.minX + chart.view.panX * rX;
+  const shared = findNearestLine(chart, dataX, dataY, height);
+  if (shared !== undefined)
+    return shared;
   let bsi = -1, bi = -1, bdx = Infinity, bdy = Infinity;
   for (let s = 0;s < chart.series.length; s++) {
     if (chart.config?.hiddenSeries?.has(s))
@@ -1105,6 +1277,79 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
     seriesLabel: sr.label
   };
 }
+// Series sharing one x array (the sampled trend): the line under the cursor is the one whose
+// segment between the two neighbouring columns passes closest, so the pick follows a line along
+// its whole length instead of jumping at vertex midpoints. Returns undefined when the series do
+// not share x, null when nothing is within reach.
+function findNearestLine(chart, dataX, dataY, height) {
+  const first = chart.series[0];
+  const xs = first.rawX;
+  const n = xs.length;
+  for (const s of chart.series)
+    if (s.rawX !== xs)
+      return;
+  if (n === 0)
+    return null;
+  const rY = chart.bounds.maxY - chart.bounds.minY;
+  const pxPerY = height / (rY / chart.view.zoomY);
+  const rX = chart.bounds.maxX - chart.bounds.minX;
+  const pxPerX = chart.width / (rX / chart.view.zoomX);
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    const mid = lo + hi >> 1;
+    if (xs[mid] < dataX)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  const c1 = lo, c0 = Math.max(0, lo - 1);
+  const t = c1 > c0 ? Math.min(1, Math.max(0, (dataX - xs[c0]) / (xs[c1] - xs[c0]))) : 0;
+  const near = t < 0.5 ? c0 : c1;
+  if (Math.abs(xs[c0] - dataX) * pxPerX > MAX_HOVER_PX && Math.abs(xs[c1] - dataX) * pxPerX > MAX_HOVER_PX && (dataX < xs[c0] || dataX > xs[c1]))
+    return null;
+  const isGap = (v) => v == null || v !== v;
+  let bsi = -1, bd = MAX_HOVER_PX;
+  for (let s = 0;s < chart.series.length; s++) {
+    if (chart.config?.hiddenSeries?.has(s))
+      continue;
+    const ys = chart.series[s].plotY ?? chart.series[s].rawY;
+    const y0 = ys[c0], y1 = ys[c1];
+    let y;
+    if (!isGap(y0) && !isGap(y1))
+      y = y0 + (y1 - y0) * t;
+    else if (!isGap(y0))
+      y = y0;
+    else if (!isGap(y1))
+      y = y1;
+    else
+      continue;
+    const d = Math.abs(y - dataY) * pxPerY;
+    if (d < bd) {
+      bd = d;
+      bsi = s;
+    }
+  }
+  if (bsi === -1)
+    return null;
+  const sr = chart.series[bsi];
+  const ys = sr.plotY ?? sr.rawY;
+  const idx = !isGap(ys[near]) ? near : near === c0 ? c1 : c0;
+  return {
+    x: xs[idx],
+    y: ys[idx],
+    value: sr.rawY[idx],
+    index: idx,
+    seriesIndex: bsi,
+    seriesLabel: sr.label
+  };
+}
+// Text colour on a fill of a series colour: the same hue pulled toward black on a light fill or
+// toward white on a dark one, by `k`, so it stays readable for any of the palette's colours.
+var onColor = (rgb, k) => {
+  const [r, g, b] = rgb.split(",").map(Number);
+  const t = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.4 ? 0 : 255;
+  return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`;
+};
 var states = new WeakMap;
 var drawBox = (ctx, x, y, w, h, r, fill, stroke) => {
   ctx.beginPath();
@@ -1122,6 +1367,7 @@ var hoverPlugin = {
     const ac = new AbortController;
     const s = {
       hoverResult: null,
+      highlight: -1,
       pillX: 0,
       pillY: 0,
       pillTargetX: 0,
@@ -1133,6 +1379,12 @@ var hoverPlugin = {
     const update = (res) => {
       if (chart.config.onHover)
         chart.config.onHover(res);
+      // The GPU draws the hovered series on top and dims the rest; only a change is posted.
+      const hl = res && chart.config.highlightHover !== false ? res.seriesIndex : -1;
+      if (hl !== s.highlight) {
+        s.highlight = hl;
+        mgr.worker?.postMessage({ type: M.SET_STYLE, id: el.dataset.chartId, highlightSeries: hl });
+      }
       if (!(chart.config.showTooltip ?? false))
         return;
       s.hoverResult = res;
@@ -1156,7 +1408,12 @@ var hoverPlugin = {
       if (chart.dragging)
         return;
       const r = el.getBoundingClientRect();
-      update(findNearestPoint(chart, clientX - r.left, clientY - r.top, r.width, r.height));
+      const res = findNearestPoint(chart, clientX - r.left, clientY - r.top, r.width, r.height);
+      if (res) {
+        res.screenX = clientX - r.left;
+        res.screenY = clientY - r.top;
+      }
+      update(res);
     };
     el.addEventListener("mousemove", (e) => handleHover(e.clientX, e.clientY), {
       signal: ac.signal
@@ -1187,35 +1444,49 @@ var hoverPlugin = {
     const rgb = `${Math.round(mainSeries.color.r * 255)},${Math.round(mainSeries.color.g * 255)},${Math.round(mainSeries.color.b * 255)}`;
     const col = `rgb(${rgb})`;
     const textCol = dark ? `oklch(from ${col} calc(l + 0.1) c h)` : col;
+    const hasY = Number.isFinite(py);
     ctx.save();
     ctx.setLineDash([4, 3]);
     ctx.strokeStyle = `rgba(${rgb},0.4)`;
-    ctx.stroke(new Path2D(`M${px} 0V${h - margin.bottom}M${margin.left} ${py}H${w}`));
+    ctx.stroke(new Path2D(hasY ? `M${px} 0V${h - margin.bottom}M${margin.left} ${py}H${w}` : `M${px} 0V${h - margin.bottom}`));
     ctx.restore();
-    ctx.beginPath();
-    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = col;
-    ctx.fill();
-    ctx.strokeStyle = dark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.9)";
-    ctx.stroke();
+    if (hasY) {
+      ctx.beginPath();
+      ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = dark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.9)";
+      ctx.stroke();
+    }
     const seriesData = chart.series.map((ser, si) => {
       if (chart.config?.hiddenSeries?.has(si))
         return null;
       let l = 0, r = ser.rawX.length - 1;
       while (l <= r) {
         const m = l + r >> 1;
-        if (Math.abs(ser.rawX[m] - hvr.x) < 0.0001)
+        if (Math.abs(ser.rawX[m] - hvr.x) < 0.0001) {
+          const v = ser.rawY[m];
+          if (v == null || v !== v)
+            return null;
+          const rgb2 = `${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)}`;
           return {
+            si,
             label: ser.label,
-            val: seriesAxisFormat(chart, si)(ser.rawY[m]),
-            rawVal: ser.rawY[m],
-            col: `rgb(${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)})`
+            val: seriesAxisFormat(chart, si)(v),
+            rawVal: v,
+            rgb: rgb2,
+            col: `rgb(${rgb2})`
           };
+        }
         ser.rawX[m] < hvr.x ? l = m + 1 : r = m - 1;
       }
       return null;
     }).filter((x) => x !== null);
     seriesData.sort((a, b) => Math.abs(b.rawVal) - Math.abs(a.rawVal));
+    // The hovered series leads the list, whatever its magnitude.
+    const hovered = seriesData.findIndex((d) => d.si === hvr.seriesIndex);
+    if (hovered > 0)
+      seriesData.unshift(...seriesData.splice(hovered, 1));
     const totalSeries = seriesData.length;
     const displayData = seriesData.slice(0, 5);
     const remainingCount = totalSeries - displayData.length;
@@ -1250,37 +1521,102 @@ var hoverPlugin = {
       ctx.restore();
     };
     drawPill(Math.max(margin.left, Math.min(w - margin.right, s.pillX)), h - margin.bottom + 4, formatX(hvr.x), true);
-    const hoveredAxis = chart.yAxes?.[chart.series[hvr.seriesIndex]?.axisIndex ?? 0];
-    const pillLabel = seriesAxisFormat(chart, hvr.seriesIndex)(hvr.value ?? hvr.y);
-    const pillY = Math.max(9, Math.min(h - margin.bottom - 9, s.pillY));
-    if (hoveredAxis?.side === "right")
-      drawPill(w - margin.right, pillY, pillLabel, false, true);
-    else
-      drawPill(margin.left, pillY, pillLabel, false);
-    const boxW = Math.max(...displayData.map((d) => ctx.measureText(d.label + d.val).width)) + 40;
-    const boxH = 30 + displayData.length * 18 + (remainingCount > 0 ? 18 : 0);
+    if (hasY) {
+      // The y pill sits on the axis the hovered series is bound to and uses that axis' format.
+      const hoveredAxis = chart.yAxes?.[chart.series[hvr.seriesIndex]?.axisIndex ?? 0];
+      const pillLabel = seriesAxisFormat(chart, hvr.seriesIndex)(hvr.value ?? hvr.y);
+      const pillY = Math.max(9, Math.min(h - margin.bottom - 9, s.pillY));
+      if (hoveredAxis?.side === "right")
+        drawPill(w - margin.right, pillY, pillLabel, false, true);
+      else
+        drawPill(margin.left, pillY, pillLabel, false);
+    }
+    // The hovered series (the highlighted line) is the tooltip's header: a block filled with
+    // its colour carrying its name, the time and the value large, so it reads as "this one"
+    // without knowing the ordering rule. The other series follow as a quiet list.
+    const rowFont = `600 10px ${fontFamily}`, nameFont = `600 11px ${fontFamily}`, valueFont = `600 18px ${fontFamily}`;
+    const rowH = 18, pad = 10;
+    const leadIsHovered = displayData.length > 0 && displayData[0].si === hvr.seriesIndex;
+    const lead = leadIsHovered ? displayData[0] : null;
+    const rows = leadIsHovered ? displayData.slice(1) : displayData;
+    const timeTxt = formatX(hvr.x);
+    const widths = [];
+    ctx.font = rowFont;
+    const timeW = ctx.measureText(timeTxt).width;
+    for (const d of rows)
+      widths.push(24 + ctx.measureText(d.label).width + 12 + ctx.measureText(d.val).width);
+    if (remainingCount > 0)
+      widths.push(ctx.measureText(`+${remainingCount} more`).width);
+    if (lead) {
+      ctx.font = nameFont;
+      widths.push(ctx.measureText(lead.label).width + 10 + timeW);
+      ctx.font = valueFont;
+      widths.push(ctx.measureText(lead.val).width);
+    } else {
+      widths.push(timeW);
+    }
+    const headerH = lead ? 46 : 26;
+    const boxW = Math.max(0, ...widths) + 2 * pad;
+    const boxH = headerH + (lead ? 4 : 0) + rows.length * rowH + (remainingCount > 0 ? rowH : 0) + 4;
     let bx = hvr.screenX + 14, by = hvr.screenY - boxH - 6;
     if (bx + boxW > w)
       bx = hvr.screenX - boxW - 14;
     by = Math.max(4, Math.min(h - boxH - 4, hvr.screenY - boxH - 6));
-    drawBox(ctx, bx, by, boxW, boxH, 6, dark ? "rgba(28,28,30,0.95)" : "rgba(255,255,255,0.96)", "rgba(0,0,0,0.08)");
-    ctx.textAlign = "left";
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, boxH, 6);
+    ctx.clip();
+    ctx.fillStyle = dark ? "rgba(28,28,30,0.95)" : "rgba(255,255,255,0.96)";
+    ctx.fillRect(bx, by, boxW, boxH);
+    if (lead) {
+      ctx.fillStyle = lead.col;
+      ctx.fillRect(bx, by, boxW, headerH);
+    }
+    ctx.restore();
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, boxH, 6);
+    ctx.strokeStyle = "rgba(0,0,0,0.08)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
     ctx.textBaseline = "middle";
-    ctx.fillStyle = dark ? "#888" : "#999";
-    ctx.fillText(formatX(hvr.x), bx + 10, by + 15);
-    displayData.forEach((sd, i) => {
-      const ty = by + 35 + i * 18;
+    if (lead) {
+      ctx.textAlign = "left";
+      ctx.font = nameFont;
+      ctx.fillStyle = onColor(lead.rgb, 0.78);
+      ctx.fillText(lead.label, bx + pad, by + 14);
+      ctx.textAlign = "right";
+      ctx.font = rowFont;
+      ctx.fillStyle = onColor(lead.rgb, 0.6);
+      ctx.fillText(timeTxt, bx + boxW - pad, by + 14);
+      ctx.textAlign = "left";
+      ctx.font = valueFont;
+      ctx.fillStyle = onColor(lead.rgb, 0.78);
+      ctx.fillText(lead.val, bx + pad, by + 33);
+    } else {
+      ctx.textAlign = "left";
+      ctx.font = rowFont;
+      ctx.fillStyle = dark ? "#888" : "#999";
+      ctx.fillText(timeTxt, bx + pad, by + 15);
+    }
+    let rowTop = by + headerH + (lead ? 4 : 0);
+    ctx.font = rowFont;
+    rows.forEach((sd) => {
+      const ty = rowTop + rowH / 2;
       ctx.fillStyle = sd.col;
       ctx.beginPath();
-      ctx.roundRect(bx + 10, ty - 4, 8, 8, 2);
+      ctx.roundRect(bx + pad, ty - 4, 8, 8, 2);
       ctx.fill();
+      ctx.textAlign = "left";
       ctx.fillStyle = dark ? "#eee" : "#1a1a1a";
-      ctx.fillText(`${sd.label}: ${sd.val}`, bx + 24, ty);
+      ctx.fillText(sd.label, bx + pad + 14, ty);
+      ctx.textAlign = "right";
+      ctx.fillText(sd.val, bx + boxW - pad, ty);
+      rowTop += rowH;
     });
     if (remainingCount > 0) {
-      const ty = by + 35 + displayData.length * 18;
+      ctx.textAlign = "left";
       ctx.fillStyle = dark ? "#666" : "#aaa";
-      ctx.fillText(`+${remainingCount} more`, bx + 10, ty);
+      ctx.fillText(`+${remainingCount} more`, bx + pad, rowTop + rowH / 2);
     }
   },
   uninstall(chart) {
@@ -1513,7 +1849,9 @@ var legendPlugin = {
       list,
       open: alwaysOpen || defaultOpen,
       abort: ac,
-      lastSeriesKey: "",
+      lastSeries: null,
+      lastHidden: "",
+      rowsDirty: true,
       computedWidth: PANEL_MAX_WIDTH
     };
     states2.set(chart, s);
@@ -1575,16 +1913,30 @@ function applyStyles(chart) {
   s.closeBtn.style.boxShadow = "none";
   s.closeBtn.style.color = styles.text;
 }
-function seriesKey(chart) {
-  return chart.series.map((s, i) => `${i}:${s.label}`).join("|");
+function sameLabels(a, b) {
+  if (a === b)
+    return true;
+  if (!a || !b || a.length !== b.length)
+    return false;
+  for (let i = 0;i < a.length; i++)
+    if (a[i].label !== b[i].label)
+      return false;
+  return true;
 }
+function hiddenSignature(chart) {
+  const hidden = chart.config.hiddenSeries;
+  if (!hidden || hidden.size === 0)
+    return "";
+  return [...hidden].sort((x, y) => x - y).join(",");
+}
+var measureCtx = null;
 function measureTextWidth(text, font, fontSize) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx)
+  if (!measureCtx)
+    measureCtx = document.createElement("canvas").getContext("2d");
+  if (!measureCtx)
     return 0;
-  ctx.font = `${fontSize}px ${font}`;
-  return ctx.measureText(text).width;
+  measureCtx.font = `${fontSize}px ${font}`;
+  return measureCtx.measureText(text).width;
 }
 function computePanelWidth(chart, labels) {
   const styles = getLegendStyles(chart);
@@ -1603,17 +1955,28 @@ function computePanelWidth(chart, labels) {
   const target = Math.ceil(maxW) + swatchGap + padding;
   return Math.min(Math.max(target, PANEL_MIN_WIDTH), PANEL_MAX_WIDTH);
 }
+// Runs on every draw, so it has to stay cheap with thousands of series: the rows are rebuilt
+// only when the labels change and only while the panel is open (a closed panel rebuilds when it
+// opens), and the hidden styling is reapplied only when the hidden set changed.
 function syncSeries(chart) {
   const s = states2.get(chart);
   if (!s)
     return;
-  const key = seriesKey(chart);
-  if (key === s.lastSeriesKey) {
-    applyHiddenState(chart, s);
+  if (!sameLabels(chart.series, s.lastSeries)) {
+    s.lastSeries = chart.series;
+    s.rowsDirty = true;
+  }
+  const open = (getLegendConfig(chart).alwaysOpen ?? false) || s.open;
+  if (s.rowsDirty) {
+    if (open)
+      rebuildRows(chart, s);
     return;
   }
-  s.lastSeriesKey = key;
-  rebuildRows(chart, s);
+  const hidden = hiddenSignature(chart);
+  if (hidden !== s.lastHidden) {
+    s.lastHidden = hidden;
+    applyHiddenState(chart, s);
+  }
 }
 function rebuildRows(chart, s) {
   const series = chart.series;
@@ -1636,6 +1999,8 @@ function rebuildRows(chart, s) {
     const labelOpacity = isHidden ? "opacity:0.4;" : "";
     return `<div class="chart-legend-row" data-series="${i}" style="${rowBase}${rowAnim};animation-delay:${animDelay}s"><span class="chart-legend-swatch" style="${swatchStyle}"></span><span class="chart-legend-label" style="${labelOpacity}${labelBase}">${escapeHtml(label)}</span></div>`;
   }).join("");
+  s.rowsDirty = false;
+  s.lastHidden = hiddenSignature(chart);
   if (s.open) {
     const packedH = s.list.scrollHeight + 20;
     s.container.style.width = `${s.computedWidth}px`;
@@ -1671,6 +2036,8 @@ function applyOpenState(chart) {
     return;
   const alwaysOpen = getLegendConfig(chart).alwaysOpen ?? false;
   const open = alwaysOpen || s.open;
+  if (open && s.rowsDirty)
+    rebuildRows(chart, s);
   s.container.style.width = open ? `${s.computedWidth}px` : `${ICON_SIZE}px`;
   s.container.style.height = `${ICON_SIZE}px`;
   s.container.style.borderRadius = open ? "8px" : "50%";
@@ -1777,8 +2144,24 @@ function zoomPlugin(opts = {}) {
             let pinchCenterX = 0.5, pinchCenterY = 0.5;
             let velX = 0, velY = 0;
             let lastTapTime = 0;
-            let edgeScaleMode = null;
-            let edgeScaleStart = 0, edgeScaleInitialZoom = 1;
+            // The axis a drag has grabbed ("x" below the plot, "y" left of it), or null.
+            let axisMode = null;
+
+            const axisAt = (e) => {
+                const rect = el.getBoundingClientRect();
+                const localX = e.clientX - rect.left, localY = e.clientY - rect.top;
+                const margin = chartMargin(chart);
+                const overY = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
+                const overX = localY > rect.height - margin.bottom;
+                if (overY && !overX) return "y";
+                if (overX && !overY) return "x";
+                return null;
+            };
+            // The cursor says what a drag would do: slide the axis under it, or pan the plot.
+            const hoverCursor = (e) => {
+                const a = axisAt(e);
+                return a === "x" ? "ew-resize" : a === "y" ? "ns-resize" : "";
+            };
 
             const sendView = () => {
                 mgr.requestRender(chart.id);
@@ -1802,29 +2185,19 @@ function zoomPlugin(opts = {}) {
                     lastY = e.clientY;
                     velX = velY = 0;
                     lastTime = performance.now();
-                    edgeScaleMode = null;
-                    if (e.pointerType === "touch") {
+                    // A press on an axis gutter grabs that axis: the drag then pans it
+                    // alone, whatever the zoom mode says about the plot area.
+                    axisMode = axisAt(e);
+                    if (axisMode) {
+                        el.style.cursor = axisMode === "x" ? "ew-resize" : "ns-resize";
+                    } else if (e.pointerType === "touch") {
                         pressTimer = window.setTimeout(() => {
                             if (gestureState === "detecting") {
                                 gestureState = "press";
                             }
                         }, PRESS_TIME);
                     } else {
-                        const rect = el.getBoundingClientRect();
-                        const localX = e.clientX - rect.left;
-                        const localY = e.clientY - rect.top;
-                        const margin = chartMargin(chart);
-                        const overYAxis = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
-                        const overXAxis = localY > rect.height - margin.bottom;
-                        if (overYAxis && !overXAxis) {
-                            edgeScaleMode = "y";
-                            edgeScaleStart = e.clientY;
-                            edgeScaleInitialZoom = chart.view.zoomY;
-                        } else if (overXAxis && !overYAxis) {
-                            edgeScaleMode = "x";
-                            edgeScaleStart = e.clientX;
-                            edgeScaleInitialZoom = chart.view.zoomX;
-                        }
+                        el.style.cursor = "grabbing";
                     }
                 } else if (pointers.length === 2) {
                     if (pressTimer) {
@@ -1851,8 +2224,12 @@ function zoomPlugin(opts = {}) {
                 if (idx >= 0) {
                     pointers[idx] = e;
                 }
-                if (pointers.length >= 1 && e.buttons === 0 && (gestureState === "pan" || gestureState === "detecting" || gestureState === "press" || edgeScaleMode !== null)) {
+                if (pointers.length >= 1 && e.buttons === 0 && (gestureState === "pan" || gestureState === "detecting" || gestureState === "press" || axisMode !== null)) {
                     endPointer(e);
+                    return;
+                }
+                if (pointers.length === 0) {
+                    if (e.pointerType !== "touch") el.style.cursor = hoverCursor(e);
                     return;
                 }
                 if (pointers.length === 1) {
@@ -1867,28 +2244,26 @@ function zoomPlugin(opts = {}) {
                     if (gestureState === "press") {
                         return;
                     }
-                    if (edgeScaleMode && e.pointerType !== "touch") {
-                        if (edgeScaleMode === "x") {
-                            const pixelDelta = e.clientX - edgeScaleStart;
-                            const scale = Math.exp(pixelDelta / 200);
-                            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, edgeScaleInitialZoom * scale));
-                            const fx = chart.view.panX + 0.5 / edgeScaleInitialZoom;
-                            chart.view.zoomX = newZoom;
-                            chart.view.panX = fx - 0.5 / newZoom;
-                            sendView();
-                            return;
-                        } else if (edgeScaleMode === "y") {
-                            const pixelDelta = edgeScaleStart - e.clientY;
-                            const scale = Math.exp(pixelDelta / 200);
-                            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, edgeScaleInitialZoom * scale));
-                            const fy = chart.view.panY + 0.5 / edgeScaleInitialZoom;
-                            chart.view.zoomY = newZoom;
-                            chart.view.panY = fy - 0.5 / newZoom;
-                            sendView();
-                            return;
+                    if (axisMode) {
+                        // Pan the grabbed axis one-to-one, so the value under the pointer
+                        // stays under the pointer: the same feel as dragging the plot,
+                        // restricted to one axis. Zooming an axis is the wheel over it,
+                        // anchored at the pointer like the wheel over the plot. It used to
+                        // stretch the axis about the centre of the view at an exponential
+                        // rate instead, so the tick under the hand slid away, and in
+                        // x-only mode the y range could not be shifted at all.
+                        const rect = el.getBoundingClientRect();
+                        if (axisMode === "x") {
+                            chart.view.panX -= (e.clientX - lastX) / rect.width / chart.view.zoomX;
+                        } else {
+                            chart.view.panY += (e.clientY - lastY) / rect.height / chart.view.zoomY;
                         }
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                        sendView();
+                        return;
                     }
-                    if (gestureState === "pan" || chart.dragging && !edgeScaleMode) {
+                    if (gestureState === "pan" || chart.dragging) {
                         const rect = el.getBoundingClientRect();
                         const dx = (e.clientX - lastX) / rect.width;
                         const dy = (e.clientY - lastY) / rect.height;
@@ -1965,7 +2340,8 @@ function zoomPlugin(opts = {}) {
                     }
                     gestureState = "none";
                     chart.dragging = false;
-                    edgeScaleMode = null;
+                    axisMode = null;
+                    el.style.cursor = e.pointerType === "touch" ? "" : hoverCursor(e);
                 } else if (pointers.length === 1) {
                     gestureState = "detecting";
                     startX = pointers[0].clientX;
@@ -1977,6 +2353,9 @@ function zoomPlugin(opts = {}) {
             };
             el.addEventListener("pointerup", endPointer, { signal: ac.signal });
             el.addEventListener("pointercancel", endPointer, { signal: ac.signal });
+            el.addEventListener("pointerleave", () => {
+                if (pointers.length === 0) el.style.cursor = "";
+            }, { signal: ac.signal });
 
             let wheelTimeout = null;
 
@@ -2058,6 +2437,10 @@ dataMinX: f32,
 dataMaxX: f32,
 dataMinY: f32,
 dataMaxY: f32,
+highlight: u32,
+_hl0: u32,
+_hl1: u32,
+_hl2: u32,
 };
 struct SeriesInfo {
 color: vec4f,
@@ -2142,11 +2525,23 @@ bestIdx = startIdx - 1u;
 } else if (startIdx >= count && count > 0u) {
 bestIdx = count - 1u;
 }
+// The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
+// edge is drawn even when the half nearer to that neighbour lies entirely off screen.
+if (outputIdx == 0u && startIdx > 0u) {
+bestIdx = startIdx - 1u;
+}
+if (outputIdx + 1u == maxCols && startIdx < count) {
+bestIdx = startIdx;
+}
 if (bestIdx >= count) {
 lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
 return;
 }
 let y = dataY[bestIdx];
+if (y < -1.0e38) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
 let normY = (y - u.viewMinY) / viewRangeY;
 let screenY = 1.0 - normY;
 let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
@@ -2154,8 +2549,8 @@ let screenX = normX;
 lineData[outputIdx] = LineData(screenX, screenY, screenY, 1.0);
 return;
 }
-var dataMinY = dataY[startIdx];
-var dataMaxY = dataY[startIdx];
+var dataMinY = 3.0e38;
+var dataMaxY = -3.0e38;
 let rangeCount = endIdx - startIdx;
 let maxSamples = lu.maxSamplesPerPixel;
 if (maxSamples > 1u && rangeCount > maxSamples) {
@@ -2164,19 +2559,29 @@ for (var s = 0u; s < maxSamples; s++) {
 let idx = startIdx + u32(f32(s) * stride);
 if (idx < endIdx) {
 let y = dataY[idx];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
+}
 }
 }
 let lastY = dataY[endIdx - 1u];
+if (lastY > -1.0e38) {
 dataMinY = min(dataMinY, lastY);
 dataMaxY = max(dataMaxY, lastY);
+}
 } else {
-for (var i = startIdx + 1u; i < endIdx; i++) {
+for (var i = startIdx; i < endIdx; i++) {
 let y = dataY[i];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
 }
+}
+}
+if (dataMaxY < dataMinY) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
 }
 let normX = (centerX - u.viewMinX) / viewRangeX;
 let screenX = normX;
@@ -2237,6 +2642,102 @@ return out;
 @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
 if (in.alpha < 0.1) { discard; }
 let series = allSeries[in.seriesIdx];
+// Every series but the hovered one steps back toward the background while a highlight is
+// set; mixed into the colour rather than the alpha, since the line passes do not blend.
+let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
+return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
+}
+`;
+
+// src/shaders/highlight.ts
+var LINE_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}
+struct ColData {
+screenX: f32,
+minScreenY: f32,
+maxScreenY: f32,
+valid: f32,
+};
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var<storage, read> cols: array<ColData>;
+@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
+struct VertexOutput {
+@builtin(position) pos: vec4f,
+@location(0) @interpolate(flat) seriesIdx: u32,
+};
+// The hovered series once more as a ribbon: two triangles per pixel-column segment, 1.5 px
+// to each side of the centre line the normal pass draws, on top of everything else.
+@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
+var out: VertexOutput;
+out.seriesIdx = series_idx;
+out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
+let maxCols = u32(u.width);
+let seg = vi / 6u;
+if (seg + 1u >= maxCols) { return out; }
+let d0 = cols[seg];
+let d1 = cols[seg + 1u];
+if (min(d0.valid, d1.valid) < 0.5) { return out; }
+let p0 = vec2f(d0.screenX * u.width, (d0.minScreenY + d0.maxScreenY) * 0.5 * u.height);
+let p1 = vec2f(d1.screenX * u.width, (d1.minScreenY + d1.maxScreenY) * 0.5 * u.height);
+let dir = p1 - p0;
+let len = length(dir);
+if (len < 1e-4) { return out; }
+let n = vec2f(-dir.y, dir.x) / len * 1.5;
+let k = vi % 6u;
+var pt = p0 + n;
+if (k == 1u || k == 3u) { pt = p0 - n; }
+if (k == 2u || k == 5u) { pt = p1 + n; }
+if (k == 4u) { pt = p1 - n; }
+out.pos = vec4f(pt.x / u.width * 2.0 - 1.0, 1.0 - pt.y / u.height * 2.0, 0.0, 1.0);
+return out;
+}
+@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
+let series = allSeries[in.seriesIdx];
+return vec4f(series.color.rgb, 1.0);
+}
+`;
+var ERROR_BAND_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}
+struct ColData {
+screenX: f32,
+loScreenY: f32,
+hiScreenY: f32,
+centerScreenY: f32,
+valid: f32,
+};
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var<storage, read> cols: array<ColData>;
+@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
+struct VertexOutput {
+@builtin(position) pos: vec4f,
+@location(0) @interpolate(flat) seriesIdx: u32,
+};
+// The hovered series once more as a ribbon: two triangles per pixel-column segment, 1.5 px
+// to each side of the centre line the normal pass draws, on top of everything else.
+@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
+var out: VertexOutput;
+out.seriesIdx = series_idx;
+out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
+let maxCols = u32(u.width);
+let seg = vi / 6u;
+if (seg + 1u >= maxCols) { return out; }
+let d0 = cols[seg];
+let d1 = cols[seg + 1u];
+if (min(d0.valid, d1.valid) < 0.5) { return out; }
+let p0 = vec2f(d0.screenX * u.width, d0.centerScreenY * u.height);
+let p1 = vec2f(d1.screenX * u.width, d1.centerScreenY * u.height);
+let dir = p1 - p0;
+let len = length(dir);
+if (len < 1e-4) { return out; }
+let n = vec2f(-dir.y, dir.x) / len * 1.5;
+let k = vi % 6u;
+var pt = p0 + n;
+if (k == 1u || k == 3u) { pt = p0 - n; }
+if (k == 2u || k == 5u) { pt = p1 + n; }
+if (k == 4u) { pt = p1 - n; }
+out.pos = vec4f(pt.x / u.width * 2.0 - 1.0, 1.0 - pt.y / u.height * 2.0, 0.0, 1.0);
+return out;
+}
+@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
+let series = allSeries[in.seriesIdx];
 return vec4f(series.color.rgb, 1.0);
 }
 `;
@@ -2246,7 +2747,8 @@ var LineChart = {
   name: "line",
   shaders: {
     compute: LINE_COMPUTE_SHADER,
-    render: LINE_RENDER_SHADER
+    render: LINE_RENDER_SHADER,
+    highlight: LINE_HIGHLIGHT_SHADER
   },
   uniforms: [
     { name: "maxSamplesPerPixel", type: "u32", default: 1e4 }
@@ -2283,6 +2785,23 @@ var LineChart = {
         alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" }
       },
       draw: ({ width }) => Math.max(0, width * 4 - 2),
+      bindings: [
+        { binding: 0, source: "uniforms" },
+        { binding: 1, source: "lineBuffer" },
+        { binding: 2, source: "series-info" }
+      ]
+    },
+    {
+      type: "render",
+      shader: "highlight",
+      topology: "triangle-list",
+      loadOp: "load",
+      highlight: true,
+      blend: {
+        color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+        alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" }
+      },
+      draw: ({ width }) => Math.max(0, (width - 1) * 6),
       bindings: [
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "lineBuffer" },
@@ -3505,7 +4024,10 @@ return out;
 @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
 if (in.alpha < 0.1) { discard; }
 let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 1.0);
+// Every series but the hovered one steps back toward the background while a highlight is
+// set; mixed into the colour rather than the alpha, since the line passes do not blend.
+let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
+return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
 }
 `;
 
@@ -4250,13 +4772,27 @@ bestIdx = startIdx - 1u;
 } else if (startIdx >= count && count > 0u) {
 bestIdx = count - 1u;
 }
+// The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
+// edge is drawn even when the half nearer to that neighbour lies entirely off screen.
+if (outputIdx == 0u && startIdx > 0u) {
+bestIdx = startIdx - 1u;
+}
+if (outputIdx + 1u == maxCols && startIdx < count) {
+bestIdx = startIdx;
+}
 if (bestIdx >= count) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
 let y = dataY[bestIdx];
-let lo = loData[bestIdx];
-let hi = hiData[bestIdx];
+if (y < -1.0e38) {
+bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
+return;
+}
+var lo = loData[bestIdx];
+var hi = hiData[bestIdx];
+if (lo < -1.0e38) { lo = y; }
+if (hi < -1.0e38) { hi = y; }
 let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
 let normY = (y - u.viewMinY) / viewRangeY;
 let normLo = (lo - u.viewMinY) / viewRangeY;
@@ -4264,10 +4800,10 @@ let normHi = (hi - u.viewMinY) / viewRangeY;
 bandData[outputIdx] = BandData(normX, 1.0 - normLo, 1.0 - normHi, 1.0 - normY, 1.0);
 return;
 }
-var dataMinY = dataY[startIdx];
-var dataMaxY = dataY[startIdx];
-var dataMinLo = loData[startIdx];
-var dataMaxHi = hiData[startIdx];
+var dataMinY = 3.0e38;
+var dataMaxY = -3.0e38;
+var dataMinLo = 3.0e38;
+var dataMaxHi = -3.0e38;
 let rangeCount = endIdx - startIdx;
 let maxSamples = eu.maxSamplesPerPixel;
 if (maxSamples > 1u && rangeCount > maxSamples) {
@@ -4276,25 +4812,45 @@ for (var s = 0u; s < maxSamples; s++) {
 let idx = startIdx + u32(f32(s) * stride);
 if (idx < endIdx) {
 let y = dataY[idx];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
-dataMinLo = min(dataMinLo, loData[idx]);
-dataMaxHi = max(dataMaxHi, hiData[idx]);
+let lo = loData[idx];
+let hi = hiData[idx];
+if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
+if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
+}
 }
 }
 let lastY = dataY[endIdx - 1u];
+if (lastY > -1.0e38) {
 dataMinY = min(dataMinY, lastY);
 dataMaxY = max(dataMaxY, lastY);
-dataMinLo = min(dataMinLo, loData[endIdx - 1u]);
-dataMaxHi = max(dataMaxHi, hiData[endIdx - 1u]);
+let lastLo = loData[endIdx - 1u];
+let lastHi = hiData[endIdx - 1u];
+if (lastLo > -1.0e38) { dataMinLo = min(dataMinLo, lastLo); }
+if (lastHi > -1.0e38) { dataMaxHi = max(dataMaxHi, lastHi); }
+}
 } else {
-for (var i = startIdx + 1u; i < endIdx; i++) {
+for (var i = startIdx; i < endIdx; i++) {
 let y = dataY[i];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
-dataMinLo = min(dataMinLo, loData[i]);
-dataMaxHi = max(dataMaxHi, hiData[i]);
+let lo = loData[i];
+let hi = hiData[i];
+if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
+if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
 }
+}
+}
+if (dataMaxY < dataMinY) {
+bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
+return;
+}
+if (dataMaxHi < dataMinLo) {
+dataMinLo = dataMinY;
+dataMaxHi = dataMaxY;
 }
 let normX = (centerX - u.viewMinX) / viewRangeX;
 let normMinLo = (dataMinLo - u.viewMinY) / viewRangeY;
@@ -4361,7 +4917,10 @@ return out;
 @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
 if (in.valid < 0.5) { discard; }
 let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, eu.bandOpacity);
+// The band of every series but the hovered one fades like its line: colour pulled toward the
+// background as well as the opacity lowered, so stacked translucent bands still recede.
+let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
+return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), eu.bandOpacity * dim);
 }
 `;
 var ERROR_BAND_LINE_RENDER_SHADER = `${UNIFORM_STRUCT}
@@ -4407,7 +4966,10 @@ return out;
 @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
 if (in.alpha < 0.1) { discard; }
 let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 1.0);
+// Every series but the hovered one steps back toward the background while a highlight is
+// set; mixed into the colour rather than the alpha, since the line passes do not blend.
+let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
+return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
 }
 `;
 
@@ -4417,7 +4979,8 @@ var ErrorBandChart = {
   shaders: {
     compute: ERROR_BAND_COMPUTE_SHADER,
     fill: ERROR_BAND_FILL_RENDER_SHADER,
-    line: ERROR_BAND_LINE_RENDER_SHADER
+    line: ERROR_BAND_LINE_RENDER_SHADER,
+    highlight: ERROR_BAND_HIGHLIGHT_SHADER
   },
   uniforms: [
     { name: "maxSamplesPerPixel", type: "u32", default: 1e4 },
@@ -4475,6 +5038,23 @@ var ErrorBandChart = {
         { binding: 1, source: "bandBuffer" },
         { binding: 2, source: "series-info" }
       ]
+    },
+    {
+      type: "render",
+      shader: "highlight",
+      topology: "triangle-list",
+      loadOp: "load",
+      highlight: true,
+      blend: {
+        color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+        alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" }
+      },
+      draw: ({ width }) => Math.max(0, (width - 1) * 6),
+      bindings: [
+        { binding: 0, source: "uniforms" },
+        { binding: 1, source: "bandBuffer" },
+        { binding: 2, source: "series-info" }
+      ]
     }
   ],
   computeBounds(series) {
@@ -4487,17 +5067,17 @@ var ErrorBandChart = {
           maxX = x;
       }
       for (const y of s.extra.hi ?? []) {
-        if (y > maxY)
+        if (y != null && y > maxY)
           maxY = y;
       }
       for (const y of s.extra.lo ?? []) {
-        if (y < minY)
+        if (y != null && y < minY)
           minY = y;
       }
       for (const y of s.rawY) {
-        if (y < minY)
+        if (y != null && y < minY)
           minY = y;
-        if (y > maxY)
+        if (y != null && y > maxY)
           maxY = y;
       }
     }
@@ -6413,6 +6993,7 @@ var watermarkPlugin = {
 };
 export {
   zoomPlugin,
+  chartMargin,
   watermarkPlugin,
   tooltipPinPlugin,
   thresholdPlugin,

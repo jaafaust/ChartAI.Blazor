@@ -14,6 +14,7 @@
                Config="Config"
                Series="Series"
                Plugins="Plugins"
+               ViewChanged="ViewChanged"
                Style="position:absolute;inset:0;width:100%;height:100%;" />
     </div>
 </div>
@@ -25,6 +26,7 @@
     [Parameter] public IEnumerable<ChartSeries> Series { get; set; } = Array.Empty<ChartSeries>();
     [Parameter] public ChartPlugins Plugins { get; set; } = ChartPlugins.None;
     [Parameter] public bool FullWidth { get; set; }
+    [Parameter] public EventCallback<ChartViewRange> ViewChanged { get; set; }
 
     public Chart? ChartRef { get; private set; }
 }

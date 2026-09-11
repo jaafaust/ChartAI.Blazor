@@ -581,6 +581,10 @@ public partial class Home
     }
 
     // ─── Live data ─────────────────────────────────────────────────────────
+    // Each tick appends one column per chart with PatchDataAsync: only that sample crosses JS
+    // interop and only that column is written into the GPU buffers. The ring-buffer mode drops
+    // the columns that left the window; accumulate keeps everything and the store grows.
+    private const int LiveWindow = 500;
     private ChartCard? _liveLine;
     private ChartCard? _liveScatter;
     private ChartCard? _liveLine2;
@@ -591,11 +595,20 @@ public partial class Home
     private ChartSeries[] _liveInit1 = Array.Empty<ChartSeries>();
     private ChartSeries[] _liveInit2 = Array.Empty<ChartSeries>();
     private ChartSeries[] _liveInit3 = Array.Empty<ChartSeries>();
-    private readonly ChartConfig _liveLineCfg = Cfg(ChartType.Line, AxisFormat.Index, AxisFormat.Price);
-    private readonly ChartConfig _liveScatterCfg = Cfg(ChartType.Scatter, AxisFormat.Index, AxisFormat.Price);
+    private readonly ChartConfig _liveLineCfg = LiveConfig(ChartType.Line);
+    private readonly ChartConfig _liveScatterCfg = LiveConfig(ChartType.Scatter);
     private int _liveSpeed = 1;
     private bool _liveAccumulate;
     private Timer? _liveTimer;
+    private string? _liveViewInfo;
+
+    private static ChartConfig LiveConfig(ChartType type)
+    {
+        var c = Cfg(type, AxisFormat.Index, AxisFormat.Price);
+        // Buffers for the window plus the column appended before the oldest one is dropped.
+        c.Capacity = LiveWindow + 8;
+        return c;
+    }
 
     private void BuildLive()
     {
@@ -629,6 +642,12 @@ public partial class Home
 
     private void OnAccumulateChanged(ChangeEventArgs e) => _liveAccumulate = (bool)(e.Value ?? false);
 
+    private Task OnLiveViewChanged(ChartViewRange r)
+    {
+        _liveViewInfo = $"view x {r.MinX:0}…{r.MaxX:0}, y {r.MinY:0.0}…{r.MaxY:0.0}";
+        return Task.CompletedTask;
+    }
+
     private async Task TickLiveAsync()
     {
         double nextX = _liveDataX.Count > 0 ? _liveDataX[^1] + 1 : 0;
@@ -641,27 +660,44 @@ public partial class Home
         _liveDataY2.Add(l2 + (DemoData.NextDouble() - 0.5) * 8);
         _liveDataY3.Add(l3 + (DemoData.NextDouble() - 0.5) * 6);
 
-        if (!_liveAccumulate && _liveDataX.Count > 500)
+        // The ring buffer keeps the last LiveWindow columns; the charts drop the same ones.
+        double? dropBefore = _liveAccumulate ? null : nextX - LiveWindow + 1;
+        if (dropBefore is { } cut)
         {
-            _liveDataX.RemoveAt(0);
-            _liveDataY1.RemoveAt(0);
-            _liveDataY2.RemoveAt(0);
-            _liveDataY3.RemoveAt(0);
+            while (_liveDataX.Count > 0 && _liveDataX[0] < cut)
+            {
+                _liveDataX.RemoveAt(0);
+                _liveDataY1.RemoveAt(0);
+                _liveDataY2.RemoveAt(0);
+                _liveDataY3.RemoveAt(0);
+            }
         }
 
-        var x = _liveDataX.ToArray();
-        await PushLive(_liveLine, DemoData.RgbHex(0.2, 0.8, 0.4), x, _liveDataY1);
-        await PushLive(_liveScatter, DemoData.RgbHex(0.9, 0.3, 0.7), x, _liveDataY2);
-        await PushLive(_liveLine2, DemoData.RgbHex(0.4, 0.5, 1), x, _liveDataY3);
+        var x = new[] { nextX };
+        await PushLive(_liveLine, x, _liveDataY1, dropBefore);
+        await PushLive(_liveScatter, x, _liveDataY2, dropBefore);
+        await PushLive(_liveLine2, x, _liveDataY3, dropBefore);
 
         StateHasChanged();
     }
 
-    private static Task PushLive(ChartCard? card, string color, double[] x, List<double> y)
+    // One column: its x, the series' newest y, and the window it belongs to. The bounds follow
+    // the newest sample and the y range of the columns on screen.
+    private Task PushLive(ChartCard? card, double[] x, List<double> y, double? dropBefore)
     {
         var chart = card?.ChartRef;
         if (chart is null) return Task.CompletedTask;
-        return chart.SetDataAsync(new[] { S("Live Data", color, x, y.ToArray()) });
+        double lo = y.Min(), hi = y.Max();
+        double pad = (hi - lo) * 0.1 + 0.01;
+        double x0 = _liveDataX[0], x1 = _liveDataX[^1];
+        double xpad = (x1 - x0) * 0.02 + 1;
+        return chart.PatchDataAsync(new ChartPatch
+        {
+            X = x,
+            Series = new[] { new ChartChannels { Y = new[] { y[^1] } } },
+            DropBefore = dropBefore,
+            Bounds = new ChartBounds { MinX = x0 - xpad, MaxX = x1 + xpad, MinY = lo - pad, MaxY = hi + pad },
+        });
     }
 
     // ─── Big data ──────────────────────────────────────────────────────────

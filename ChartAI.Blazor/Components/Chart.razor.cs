@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using ChartAI.Blazor.Models;
 using Microsoft.AspNetCore.Components;
@@ -21,8 +22,22 @@ public partial class Chart : IAsyncDisposable
     /// <summary>Per-chart interactive plugins to attach (crosshair, ruler, minimap, …).</summary>
     [Parameter] public ChartPlugins Plugins { get; set; } = ChartPlugins.None;
 
+    /// <summary>
+    /// Text shown in the host element when the browser gives the engine no WebGPU adapter
+    /// (no WebGPU, no GPU, a fingerprinting shield), instead of an empty box. Null shows a
+    /// built-in English notice.
+    /// </summary>
+    [Parameter] public string? UnavailableText { get; set; }
+
+    /// <summary>
+    /// Raised with the data range visible in the plot area once a zoom or pan gesture has
+    /// settled. A live chart uses it to fetch the window the user moved to.
+    /// </summary>
+    [Parameter] public EventCallback<ChartViewRange> ViewChanged { get; set; }
+
     private ElementReference chartContainer;
     private IJSObjectReference? module;
+    private DotNetObjectReference<Chart>? selfRef;
     private bool isInitialized;
     private ChartPlugins lastPlugins = ChartPlugins.None;
     private ChartConfig? lastConfig;
@@ -39,10 +54,34 @@ public partial class Chart : IAsyncDisposable
         {
             module = await JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import", "./_content/ChartAI.Blazor/chartai-blazor.js");
-            await module.InvokeVoidAsync("initEngine");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading ChartAI: {ex.Message}");
+            return;
+        }
 
+        try
+        {
+            await module.InvokeVoidAsync("initEngine");
+        }
+        catch (Exception ex)
+        {
+            // Nothing can ever be drawn without an adapter: say so in the host element.
+            Console.WriteLine($"ChartAI: WebGPU unavailable: {ex.Message}");
+            try { await module.InvokeVoidAsync("showUnavailable", chartContainer, UnavailableText); } catch { }
+            return;
+        }
+
+        try
+        {
             await module.InvokeVoidAsync("createChart", chartContainer, Id, Config, PluginNames());
             await module.InvokeVoidAsync("updateSeries", Id, Series);
+            if (ViewChanged.HasDelegate)
+            {
+                selfRef = DotNetObjectReference.Create(this);
+                await module.InvokeVoidAsync("watchView", Id, selfRef);
+            }
 
             lastPlugins = Plugins;
             lastConfig = Config;
@@ -94,11 +133,42 @@ public partial class Chart : IAsyncDisposable
         await module.InvokeVoidAsync("updateSeries", Id, Series);
     }
 
-    /// <summary>Push new series data without re-evaluating other parameters (for live updates).</summary>
-    public async Task SetDataAsync(IEnumerable<ChartSeries> series)
+    /// <summary>Replace the series data without re-evaluating other parameters.</summary>
+    public Task SetDataAsync(IEnumerable<ChartSeries> series) => SetDataAsync(series, null, null);
+
+    /// <summary>
+    /// Replace the series data and size the GPU buffers for <paramref name="capacity"/>
+    /// columns, so <see cref="PatchDataAsync"/> can append up to that many without recreating
+    /// them. <paramref name="bounds"/> sets the data window; a side left null comes from the data.
+    /// </summary>
+    public async Task SetDataAsync(IEnumerable<ChartSeries> series, int? capacity, ChartBounds? bounds)
     {
         if (isInitialized && module is not null)
-            await module.InvokeVoidAsync("updateSeries", Id, series);
+            await module.InvokeVoidAsync("updateSeries", Id, series, new SetDataOptions(capacity, bounds));
+    }
+
+    /// <summary>
+    /// Write columns in place instead of replacing the data: only the patched columns cross
+    /// JS interop and only they are written into the existing GPU buffers, so a live tick costs
+    /// the size of its delta rather than a rebuild of the chart. Every series must share the x
+    /// axis, ascending; <see cref="ChartConfig.Capacity"/> sizes the buffers and they grow when
+    /// a patch does not fit. Returns the column count after the patch.
+    /// </summary>
+    public async Task<int> PatchDataAsync(ChartPatch patch)
+    {
+        if (!isInitialized || module is null) return 0;
+        return await module.InvokeAsync<int>("patchSeries", Id, patch);
+    }
+
+    /// <summary>
+    /// Move the data window without touching the data: a follow tick on which nothing new
+    /// arrived. A side left null keeps its value; <paramref name="resetView"/> puts the view
+    /// back to its home transform first.
+    /// </summary>
+    public async Task SetBoundsAsync(ChartBounds bounds, bool resetView = false)
+    {
+        if (isInitialized && module is not null)
+            await module.InvokeVoidAsync("setBounds", Id, bounds, resetView);
     }
 
     /// <summary>Animate the view back to its home (fit-to-data) transform.</summary>
@@ -107,6 +177,10 @@ public partial class Chart : IAsyncDisposable
         if (isInitialized && module is not null)
             await module.InvokeVoidAsync("resetView", Id);
     }
+
+    [JSInvokable]
+    public Task OnViewChanged(double minX, double maxX, double minY, double maxY)
+        => ViewChanged.InvokeAsync(new ChartViewRange(minX, maxX, minY, maxY));
 
     private string[] PluginNames()
     {
@@ -119,6 +193,10 @@ public partial class Chart : IAsyncDisposable
         if (Plugins.HasFlag(ChartPlugins.RangeSelector)) names.Add("range-selector");
         return names.ToArray();
     }
+
+    private sealed record SetDataOptions(
+        [property: JsonPropertyName("capacity")] int? Capacity,
+        [property: JsonPropertyName("bounds")] ChartBounds? Bounds);
 
     public async ValueTask DisposeAsync()
     {
@@ -134,5 +212,6 @@ public partial class Chart : IAsyncDisposable
                 // Ignore dispose errors (circuit teardown / JS already gone)
             }
         }
+        selfRef?.Dispose();
     }
 }

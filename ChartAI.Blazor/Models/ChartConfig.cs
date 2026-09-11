@@ -61,6 +61,32 @@ public class ChartConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double[]? BgColor { get; set; }
 
+    /// <summary>
+    /// Columns the GPU buffers are sized for, so <c>Chart.PatchDataAsync</c> can append up to
+    /// that many without recreating them. Null sizes them for the data; a patch that does not
+    /// fit grows them (one full upload).
+    /// </summary>
+    [JsonPropertyName("capacity")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Capacity { get; set; }
+
+    /// <summary>
+    /// Draw the hovered series on top and fade every other series toward the background while
+    /// the pointer is on a line (default true).
+    /// </summary>
+    [JsonPropertyName("highlightHover")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HighlightHover { get; set; }
+
+    /// <summary>
+    /// Paint the axis margins as a gradient that fades the data out toward the borders (default
+    /// true). False paints plain strips with a hard edge at the margin and starts the home view
+    /// right at it, so the whole data window is visible.
+    /// </summary>
+    [JsonPropertyName("bgFade")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? BgFade { get; set; }
+
     // ─── Renderer-specific numeric uniforms ────────────────────────────────
     [JsonPropertyName("pointSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

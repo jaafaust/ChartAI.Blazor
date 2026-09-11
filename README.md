@@ -6,6 +6,8 @@
 A Blazor component for **[chartai](https://github.com/dgerrells/chartai)**, a tiny WebGPU chart
 engine that renders millions of points across thousands of series off the main thread.
 The engine ships bundled inside the package; there is nothing to install on the JS side.
+The bundled build is upstream chartai 1.1.0 plus the changes listed in the changelog: in-place
+data patching, gaps, multiple y axes, anti-aliased lines, GPU hover highlight and axis panning.
 
 * **[chartai (upstream)](https://github.com/dgerrells/chartai)**
 * **[Examples](https://dgerrells.github.io/chartai/)**
@@ -15,7 +17,8 @@ The engine ships bundled inside the package; there is nothing to install on the 
 ## Requirements
 
 * .NET 10 (Blazor WebAssembly or an interactive Server render mode; the component uses JS interop, so it does not render under static SSR).
-* A browser with WebGPU (current Chrome, Edge, Safari and Firefox).
+* A browser with WebGPU (current Chrome, Edge, Safari and Firefox). Without a WebGPU adapter
+  the host element shows a notice (`Chart.UnavailableText`) instead of an empty box.
 
 ## Install
 
@@ -73,7 +76,49 @@ the `Plugins` flags parameter:
 * Assign a **new** `Config` or `Series` instance and the component pushes the change to the engine
   (changes are detected by reference).
 * Mutated an object in place? Call `RefreshAsync()` on a `@ref` to resend it.
-* For live data call `SetDataAsync(series)`; `ResetViewAsync()` animates back to fit-to-data.
+* `SetDataAsync(series)` replaces the data; `ResetViewAsync()` animates back to fit-to-data.
+* A missing sample is `double.NaN` in any channel; it travels as JSON null and renders as a gap.
+* While the pointer is on a line that series is drawn on top and the others fade
+  (`ChartConfig.HighlightHover`); the tooltip leads with it. Dragging an axis gutter pans that
+  axis, the wheel over it zooms it.
+* `ChartConfig.BgColor` is the opaque background the axis margins are painted in. By default
+  they are a gradient that fades the data out toward the borders; `BgFade = false` paints them
+  as plain strips with a hard edge and starts the home view at that edge.
+
+### Live data
+
+A chart that follows a stream should not be rebuilt per tick. `PatchDataAsync` writes columns
+in place: only the patched columns cross JS interop, and the engine writes them straight into
+the existing GPU buffers. Every series of such a chart shares the x axis, ascending.
+
+```razor
+<Chart @ref="chart" Config="config" Series="series" ViewChanged="OnViewChanged" />
+
+@code {
+    // Buffers for a window of 500 columns; they grow on demand when a patch does not fit.
+    private readonly ChartConfig config = new() { Type = ChartType.Line, Capacity = 512 };
+
+    private Task Tick(double x, double a, double b) => chart.PatchDataAsync(new ChartPatch
+    {
+        X = [x],                                          // one new column
+        Series = [new() { Y = [a] }, new() { Y = [b] }],  // one entry per series
+        DropBefore = x - 500,                             // ring buffer: drop what left the window
+        Bounds = new ChartBounds { MinX = x - 500, MaxX = x },
+    });
+
+    // The visible range after the user zoomed or panned: fetch that window.
+    private Task OnViewChanged(ChartViewRange r) => LoadAsync(r.MinX, r.MaxX);
+}
+```
+
+* `Offset` rewrites from a column on (the newest sample refreshed); null appends.
+* `Drop` / `DropBefore` discard the oldest columns first, so a window of fixed length never grows.
+* `Bounds` moves the data window with the patch; `SetBoundsAsync` does only that when nothing
+  new arrived. A side left null keeps its value.
+* `ResetView` puts the view back to its home transform, so the moved window is what is shown.
+* `SetDataAsync(series, capacity, bounds)` reloads everything with the buffers sized for `capacity`.
+* With several y axes a patch keeps the secondary axes' ranges; reload with `SetDataAsync` to
+  rescale them.
 
 ### Dark mode
 

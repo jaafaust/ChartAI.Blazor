@@ -5,6 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- `Chart.PatchDataAsync(ChartPatch)`: append or rewrite columns in place. Only the patched columns cross JS interop and only they are written into the existing GPU buffers; `Drop`/`DropBefore` trim a ring buffer, `Bounds` moves the window, `ResetView` puts the view home. `ChartConfig.Capacity` sizes the buffers; they grow when a patch does not fit.
+- `Chart.SetBoundsAsync` and `Chart.SetDataAsync(series, capacity, bounds)`.
+- `Chart.ViewChanged`: the data range visible in the plot area once a zoom or pan gesture has settled.
+- `Chart.UnavailableText`: a notice in the host element when the browser gives the engine no WebGPU adapter, instead of an empty box.
+- `ChartConfig.HighlightHover`.
+- `ChartConfig.BgFade`: false paints the axis margins as hard-edged strips instead of the gradient that fades the data out toward the borders, and starts the home view at the margin.
+- Gaps: `double.NaN` in any value channel serializes as null and renders as a gap (`GapArrayConverter`).
+
+### Changed
+- `ChartSeries` derives from the new `ChartChannels`, which holds the value channels; a patch carries `ChartChannels` per series.
+- Bundled engine: the hovered series is drawn on top on the GPU and every other series (bands included) fades toward the background; the tooltip leads with the hovered series in a block of its colour; render passes go through 4x MSAA and lines reach the window edges when zoomed in; dragging an axis gutter pans that axis one to one while the wheel over it zooms; series sharing one x array upload it once and sorted input is kept by reference; the affine remap of secondary-axis series keeps gaps.
+
 ## [1.0.0] - 2026-09-03
 
 ### Added

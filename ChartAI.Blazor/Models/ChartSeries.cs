@@ -4,13 +4,86 @@ using System.Text.Json.Serialization;
 namespace ChartAI.Blazor.Models;
 
 /// <summary>
-/// A single data series. Beyond x/y, the engine treats any additional numeric
-/// array on the object as an "extra" channel addressed by name in shaders
-/// (e.g. open/high/low for candlesticks, lo/hi for error bands, r for bubbles,
-/// value for heatmaps, h/t/bw for waterfalls). Convenience properties cover the
-/// built-in channels; <see cref="Extra"/> allows arbitrary custom channels.
+/// The value channels of one series: y plus the renderer-specific extra arrays the engine
+/// addresses by name in shaders (open/high/low for candlesticks and OHLC, lo/hi for error
+/// bands, r for bubbles, value for heatmaps, h/t/bw for waterfalls). <see cref="Extra"/>
+/// allows arbitrary custom channels. A missing sample is <see cref="double.NaN"/>; it travels
+/// as JSON null and the engine draws it as a gap.
+/// <see cref="ChartSeries"/> adds the identity of a series (label, colour, x);
+/// <see cref="ChartPatch"/> carries only these channels for the columns it appends.
 /// </summary>
-public class ChartSeries
+public class ChartChannels
+{
+    [JsonPropertyName("y")]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[] Y { get; set; } = Array.Empty<double>();
+
+    // ─── Built-in extra channels ───────────────────────────────────────────
+    [JsonPropertyName("open")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Open { get; set; }
+
+    [JsonPropertyName("high")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? High { get; set; }
+
+    [JsonPropertyName("low")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Low { get; set; }
+
+    /// <summary>Heatmap cell intensity (0–1) per point.</summary>
+    [JsonPropertyName("value")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Value { get; set; }
+
+    /// <summary>Bubble radius (data units) per point.</summary>
+    [JsonPropertyName("r")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? R { get; set; }
+
+    /// <summary>Error-band lower bound per point.</summary>
+    [JsonPropertyName("lo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Lo { get; set; }
+
+    /// <summary>Error-band upper bound per point.</summary>
+    [JsonPropertyName("hi")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Hi { get; set; }
+
+    // Waterfall precomputed geometry (see ChartSeries.Waterfall)
+    [JsonPropertyName("h")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? H { get; set; }
+
+    [JsonPropertyName("t")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? T { get; set; }
+
+    [JsonPropertyName("bw")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
+    public double[]? Bw { get; set; }
+
+    /// <summary>Arbitrary additional numeric channels, flattened into the series JSON.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>
+/// A single data series: its label, colour and x values plus the channels of
+/// <see cref="ChartChannels"/>.
+/// </summary>
+public class ChartSeries : ChartChannels
 {
     [JsonPropertyName("label")]
     public string Label { get; set; } = string.Empty;
@@ -21,9 +94,6 @@ public class ChartSeries
 
     [JsonPropertyName("x")]
     public double[] X { get; set; } = Array.Empty<double>();
-
-    [JsonPropertyName("y")]
-    public double[] Y { get; set; } = Array.Empty<double>();
 
     [JsonPropertyName("hidden")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
@@ -37,56 +107,6 @@ public class ChartSeries
     [JsonPropertyName("yAxis")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? YAxis { get; set; }
-
-    // ─── Built-in extra channels ───────────────────────────────────────────
-    [JsonPropertyName("open")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Open { get; set; }
-
-    [JsonPropertyName("high")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? High { get; set; }
-
-    [JsonPropertyName("low")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Low { get; set; }
-
-    /// <summary>Heatmap cell intensity (0–1) per point.</summary>
-    [JsonPropertyName("value")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Value { get; set; }
-
-    /// <summary>Bubble radius (data units) per point.</summary>
-    [JsonPropertyName("r")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? R { get; set; }
-
-    /// <summary>Error-band lower bound per point.</summary>
-    [JsonPropertyName("lo")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Lo { get; set; }
-
-    /// <summary>Error-band upper bound per point.</summary>
-    [JsonPropertyName("hi")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Hi { get; set; }
-
-    // Waterfall precomputed geometry (see ChartSeries.Waterfall)
-    [JsonPropertyName("h")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? H { get; set; }
-
-    [JsonPropertyName("t")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? T { get; set; }
-
-    [JsonPropertyName("bw")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double[]? Bw { get; set; }
-
-    /// <summary>Arbitrary additional numeric channels, flattened into the series JSON.</summary>
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
 
     /// <summary>
     /// Build a waterfall-ready series from sequential deltas. Ports the engine's
@@ -155,5 +175,33 @@ public class ChartSeries
             T = t,
             Bw = bw,
         };
+    }
+}
+
+/// <summary>
+/// Serializes a value channel with NaN and infinities as JSON null, the gap the engine
+/// understands (System.Text.Json refuses NaN otherwise), and reads null back as NaN.
+/// </summary>
+public sealed class GapArrayConverter : JsonConverter<double[]>
+{
+    public override double[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("Expected an array of numbers.");
+        var values = new List<double>();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            values.Add(reader.TokenType == JsonTokenType.Null ? double.NaN : reader.GetDouble());
+        return values.ToArray();
+    }
+
+    public override void Write(Utf8JsonWriter writer, double[] value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var v in value)
+        {
+            if (double.IsFinite(v)) writer.WriteNumberValue(v);
+            else writer.WriteNullValue();
+        }
+        writer.WriteEndArray();
     }
 }
