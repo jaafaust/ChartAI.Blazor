@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-11
+
+### Added
+- Annotation labels are clickable: a click on a label pill raises `Chart.AnnotationClicked` with the annotation's new `Id`, calls `config.onAnnotationClick` in JavaScript and dispatches `chartai-annotation-click` from the host element, and reaches neither the zoom nor the host's own click handlers. The pointer shows a hand over a pill.
+- `Annotation.LabelPosition`: `Top` puts a vertical line's label just inside the top of the plot, where the x-axis labels cannot collide with it. Vertical-line labels are laid out in lanes, so neighbours no longer draw over each other.
+
 ## [1.1.1] - 2026-09-11
 
 ### Fixed
