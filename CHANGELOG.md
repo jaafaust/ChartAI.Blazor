@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-11
+
 ### Added
 - `Chart.PatchDataAsync(ChartPatch)`: append or rewrite columns in place. Only the patched columns cross JS interop and only they are written into the existing GPU buffers; `Drop`/`DropBefore` trim a ring buffer, `Bounds` moves the window, `ResetView` puts the view home. `ChartConfig.Capacity` sizes the buffers; they grow when a patch does not fit.
 - `Chart.SetBoundsAsync` and `Chart.SetDataAsync(series, capacity, bounds)`.
@@ -28,5 +30,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Multiple Y axes with left/right placement (`ChartConfig.YAxes`, `ChartSeries.YAxis`).
 - Built-in axis formatters (`AxisFormat`).
 
-[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jaafaust/ChartAI.Blazor/releases/tag/v1.0.0
