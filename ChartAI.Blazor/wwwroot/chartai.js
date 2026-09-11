@@ -836,8 +836,9 @@ class _ChartManager {
     this.sendViewTransform(chart);
     this.drawChart(chart);
   }
+  // sync: false, or the axes linked charts share - "x", "y" or "both" (true means "both").
   setSyncViews(sync) {
-    this._syncViews = sync;
+    this._syncViews = sync === true ? "both" : sync || false;
   }
   setTheme(dark) {
     this._isDark = dark;
@@ -908,13 +909,26 @@ class _ChartManager {
       zoomY: chart.view.zoomY
     });
   }
-  // Linked charts share the x axis only: the window is one thing, the scale of each plot its
-  // own. Copying the whole view put every plot on the source's y pan and zoom as well, so a y
-  // zoom on one plot rescaled the others in units that were not theirs.
+  // Linked charts share the axes setSyncViews named. Charts of one quantity want both; a trend
+  // page, whose plots share the window but each have their own scale, links "x" alone.
   syncAllViews(source) {
+    const mode = this._syncViews;
+    const x = mode === "x" || mode === "both";
+    const y = mode === "y" || mode === "both";
+    if (!x && !y)
+      return;
     for (const chart of this.charts.values()) {
       if (chart.id !== source.id) {
-        chart.view = { ...chart.view, panX: source.view.panX, zoomX: source.view.zoomX };
+        const view = { ...chart.view };
+        if (x) {
+          view.panX = source.view.panX;
+          view.zoomX = source.view.zoomX;
+        }
+        if (y) {
+          view.panY = source.view.panY;
+          view.zoomY = source.view.zoomY;
+        }
+        chart.view = view;
         this.sendViewTransform(chart);
         this.drawChart(chart);
       }

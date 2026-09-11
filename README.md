@@ -75,6 +75,10 @@ Annotation labels are clickable: `AnnotationClicked` receives the `Id` of the an
 label was clicked. A vertical line's label sits in the bottom margin, or just inside the top of
 the plot with `LabelPosition = AnnotationLabelPosition.Top`; neighbouring labels stack in lanes.
 
+Charts on one page can be linked: the module's `setSyncViews(mode)` mirrors a zoom or pan to every
+other chart - `true` or `"both"` on both axes, `"x"` or `"y"` on one. A trend page links the time
+axis and leaves each plot its own scale.
+
 ### Updating a chart
 
 * Assign a **new** `Config` or `Series` instance and the component pushes the change to the engine

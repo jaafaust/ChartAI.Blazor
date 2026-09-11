@@ -452,8 +452,9 @@ export function setTheme(isDark) {
     ChartManager.setTheme(!!isDark);
 }
 
+// sync: true (both axes), false, or the axes to share - 'x', 'y' or 'both'.
 export function setSyncViews(sync) {
-    ChartManager.setSyncViews(!!sync);
+    ChartManager.setSyncViews(typeof sync === 'string' ? sync : !!sync);
 }
 
 // The engine could not start (no WebGPU, no adapter): say so in the host element instead of
