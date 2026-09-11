@@ -775,15 +775,19 @@ public partial class Home
     private AnnotationType _newAnnType = AnnotationType.HLine;
     private double? _newAnnValue;
     private string? _newAnnLabel;
+    private string? _clickedAnnotation;
 
     private async Task AddAnnotation()
     {
         if (_newAnnValue is null) return;
         _interactiveAnnotations.Add(new Annotation
         {
+            Id = $"ann-{_interactiveAnnotations.Count + 1}",
             Type = _newAnnType,
             Value = _newAnnValue.Value,
             Label = string.IsNullOrWhiteSpace(_newAnnLabel) ? null : _newAnnLabel,
+            // A vertical line's label at the top, clear of the x-axis labels.
+            LabelPosition = _newAnnType == AnnotationType.VLine ? AnnotationLabelPosition.Top : null,
             Color = "rgba(68,102,255,0.85)",
         });
         _interactiveConfig.Annotations = new List<Annotation>(_interactiveAnnotations);
@@ -796,7 +800,14 @@ public partial class Home
     {
         _interactiveAnnotations.Clear();
         _interactiveConfig.Annotations = new List<Annotation>();
+        _clickedAnnotation = null;
         if (_interactiveChart is not null) await _interactiveChart.RefreshAsync();
+    }
+
+    private void OnAnnotationClicked(string? id)
+    {
+        var ann = _interactiveAnnotations.FirstOrDefault(a => a.Id == id);
+        _clickedAnnotation = ann is null ? id : $"{ann.Label ?? ann.Type.ToString()} at {ann.Value}";
     }
 
     public async ValueTask DisposeAsync()

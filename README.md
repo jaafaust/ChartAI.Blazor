@@ -71,6 +71,10 @@ the `Plugins` flags parameter:
 
 `ChartPlugins.Crosshair | Stats | Ruler | TooltipPin | Minimap | RangeSelector`
 
+Annotation labels are clickable: `AnnotationClicked` receives the `Id` of the annotation whose
+label was clicked. A vertical line's label sits in the bottom margin, or just inside the top of
+the plot with `LabelPosition = AnnotationLabelPosition.Top`; neighbouring labels stack in lanes.
+
 ### Updating a chart
 
 * Assign a **new** `Config` or `Series` instance and the component pushes the change to the engine

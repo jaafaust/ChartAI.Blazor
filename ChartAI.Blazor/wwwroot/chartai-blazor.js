@@ -324,7 +324,7 @@ export function createChart(container, id, config, pluginNames) {
         if (plugin) chart.addPlugin(plugin);
     }
 
-    charts.set(id, { chart, plugins, store: null, viewRef: null, viewTimer: null, viewAbort: null, lastView: null });
+    charts.set(id, { chart, plugins, store: null, viewRef: null, viewTimer: null, viewAbort: null, lastView: null, annRef: null, annAbort: null });
 }
 
 export function recreateChart(container, id, config, pluginNames) {
@@ -332,6 +332,7 @@ export function recreateChart(container, id, config, pluginNames) {
     destroyChart(id);
     createChart(container, id, config, pluginNames);
     if (old?.viewRef) watchView(id, old.viewRef);
+    if (old?.annRef) watchAnnotations(id, old.annRef);
 }
 
 export function updateSeries(id, seriesData, opts) {
@@ -542,11 +543,30 @@ function report(entry) {
     entry.viewRef.invokeMethodAsync('OnViewChanged', r.minX, r.maxX, r.minY, r.maxY).catch(() => { });
 }
 
+// ─── Annotation labels ───────────────────────────────────────────────────────
+// The annotations plugin dispatches "chartai-annotation-click" from the host when a label
+// pill is clicked; the annotation's id goes to .NET.
+
+export function watchAnnotations(id, dotNetRef) {
+    const entry = charts.get(id);
+    const c = entry?.chart._c;
+    if (!c) return;
+    entry.annAbort?.abort();
+    entry.annRef = dotNetRef;
+    const ac = new AbortController();
+    entry.annAbort = ac;
+    c.el.addEventListener('chartai-annotation-click', (e) => {
+        // The .NET object may already be disposed when this lands.
+        entry.annRef.invokeMethodAsync('OnAnnotationClicked', e.detail?.id ?? null).catch(() => { });
+    }, { signal: ac.signal });
+}
+
 export function destroyChart(id) {
     const entry = charts.get(id);
     if (!entry) return;
     stopReport(entry);
     entry.viewAbort?.abort();
+    entry.annAbort?.abort();
     entry.chart.destroy();
     charts.delete(id);
 }

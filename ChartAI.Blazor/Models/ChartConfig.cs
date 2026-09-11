@@ -433,6 +433,16 @@ public class Annotation
     [JsonPropertyName("lineWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? LineWidth { get; set; }
+
+    /// <summary>Names the annotation in the chart's AnnotationClicked when its label is clicked.</summary>
+    [JsonPropertyName("id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
+    /// <summary>Where a vertical line's label sits: in the bottom margin (default) or just inside the top of the plot.</summary>
+    [JsonPropertyName("labelPosition")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnnotationLabelPosition? LabelPosition { get; set; }
 }
 
 public class Threshold

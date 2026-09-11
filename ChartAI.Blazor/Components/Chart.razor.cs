@@ -35,6 +35,13 @@ public partial class Chart : IAsyncDisposable
     /// </summary>
     [Parameter] public EventCallback<ChartViewRange> ViewChanged { get; set; }
 
+    /// <summary>
+    /// Raised with the <see cref="Annotation.Id"/> of the annotation whose label was clicked
+    /// (null when it has none). Such a click reaches neither the zoom nor a click handler of
+    /// the host.
+    /// </summary>
+    [Parameter] public EventCallback<string?> AnnotationClicked { get; set; }
+
     private ElementReference chartContainer;
     private IJSObjectReference? module;
     private DotNetObjectReference<Chart>? selfRef;
@@ -77,10 +84,17 @@ public partial class Chart : IAsyncDisposable
         {
             await module.InvokeVoidAsync("createChart", chartContainer, Id, Config, PluginNames());
             await module.InvokeVoidAsync("updateSeries", Id, Series);
-            if (ViewChanged.HasDelegate)
+            if (ViewChanged.HasDelegate || AnnotationClicked.HasDelegate)
             {
                 selfRef = DotNetObjectReference.Create(this);
+            }
+            if (ViewChanged.HasDelegate)
+            {
                 await module.InvokeVoidAsync("watchView", Id, selfRef);
+            }
+            if (AnnotationClicked.HasDelegate)
+            {
+                await module.InvokeVoidAsync("watchAnnotations", Id, selfRef);
             }
 
             lastPlugins = Plugins;
@@ -181,6 +195,10 @@ public partial class Chart : IAsyncDisposable
     [JSInvokable]
     public Task OnViewChanged(double minX, double maxX, double minY, double maxY)
         => ViewChanged.InvokeAsync(new ChartViewRange(minX, maxX, minY, maxY));
+
+    [JSInvokable]
+    public Task OnAnnotationClicked(string? id)
+        => AnnotationClicked.InvokeAsync(id);
 
     private string[] PluginNames()
     {

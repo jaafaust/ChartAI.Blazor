@@ -130,6 +130,16 @@ public enum AnnotationType
     [JsonStringEnumMemberName("vregion")] VRegion,
 }
 
+/// <summary>Where a vertical line's label pill sits.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<AnnotationLabelPosition>))]
+public enum AnnotationLabelPosition
+{
+    /// <summary>Centred in the bottom margin, over the x-axis labels.</summary>
+    [JsonStringEnumMemberName("bottom")] Bottom,
+    /// <summary>Just inside the top edge of the plot, clear of the axis labels; neighbours stack in lanes.</summary>
+    [JsonStringEnumMemberName("top")] Top,
+}
+
 /// <summary>
 /// Per-chart interactive plugins that are attached individually (via addPlugin)
 /// rather than registered globally. Combine with bitwise OR.
