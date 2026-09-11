@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-11
+
 ### Fixed
 - Error-band, area and baseline-area fills showed a darker vertical seam at every sample once the view was zoomed in far enough for the samples to be sparser than the pixels: the column holding a sample placed its vertex at the pixel centre while the empty columns around it collapsed onto the sample, so the fill strip folded over itself and blended twice.
 
@@ -33,6 +35,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Multiple Y axes with left/right placement (`ChartConfig.YAxes`, `ChartSeries.YAxis`).
 - Built-in axis formatters (`AxisFormat`).
 
-[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jaafaust/ChartAI.Blazor/releases/tag/v1.0.0
