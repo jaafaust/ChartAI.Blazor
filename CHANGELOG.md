@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- `BarOpacity` on `ChartConfig` (engine uniform `barOpacity`): the fill opacity of a bar chart's bars, 0 to 1, default 1. The bar shader used a fixed 0.85, but every pixel column a bar covered redrew the whole bar, so the fills stacked to opaque anyway; each bar is now drawn once, which is what makes the opacity take effect.
+
 ### Changed
 - The chart engine is built from TypeScript again. `ChartAI.Blazor/engine/src` holds the chartai sources (upstream 1.1.0 plus every change this project had made to the bundle), and `engine/build.ts` bundles them with Bun into `wwwroot/chartai.js`. The .NET build runs it when Bun is installed and a source is newer than the bundle; CI rebuilds the bundle and fails when the committed one is stale. The WGSL shaders in the bundle are now minified, as in upstream's own builds.
 

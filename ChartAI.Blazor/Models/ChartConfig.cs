@@ -100,6 +100,14 @@ public class ChartConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? BandOpacity { get; set; }
 
+    /// <summary>
+    /// Fill opacity of the bars of a <see cref="ChartType.Bar"/> chart, 0 to 1 (default 1, solid).
+    /// Lower it to see overlapping bars of several series through each other.
+    /// </summary>
+    [JsonPropertyName("barOpacity")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? BarOpacity { get; set; }
+
     // step
     [JsonPropertyName("stepMode")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]

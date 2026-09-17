@@ -4,6 +4,8 @@ import { BOX_COMPUTE_SHADER, BOX_RENDER_SHADER } from "../shaders/box.ts";
 
 export interface BarConfig {
   maxSamplesPerPixel?: number;
+  // Fill opacity of the bars, 0..1 (default 1: solid).
+  barOpacity?: number;
 }
 
 declare module "../types.ts" {
@@ -18,8 +20,10 @@ export const BarChart: RendererPlugin = {
     compute: BOX_COMPUTE_SHADER,
     render: BOX_RENDER_SHADER,
   },
+  // Order matters: it is the field order of BarUniforms in shaders/box.ts.
   uniforms: [
     { name: "maxSamplesPerPixel", type: "u32", default: 10000 },
+    { name: "barOpacity",         type: "f32", default: 1.0 },
   ],
   buffers: [
     {
@@ -59,6 +63,7 @@ export const BarChart: RendererPlugin = {
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "barBuffer" },
         { binding: 2, source: "series-info" },
+        { binding: 3, source: "custom-uniforms" },
       ],
     },
   ],

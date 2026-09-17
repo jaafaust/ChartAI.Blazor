@@ -1,7 +1,10 @@
 import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
 
+// Layout of the bar chart's custom uniforms, in the order charts/bar.ts declares them.
+const BAR_UNIFORMS = `struct BarUniforms { maxSamplesPerPixel: u32, barOpacity: f32, _p2: u32, _p3: u32 };`;
+
 export const BOX_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct BarUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
+${BAR_UNIFORMS}
 struct BarData {
 screenX: f32,
 minY: f32,
@@ -87,6 +90,16 @@ if (!hit) {
 barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
 return;
 }
+// Every column a bar spans sees it here, but only one may emit its rectangle, or the
+// translucent fills stack up to opaque (a 20 px bar drawn 20 times). The column holding the
+// bar's centre draws it and that one takes the branch below; a bar whose centre lies outside
+// the view is drawn by the edge column its centre is clamped to.
+let cx = clamp(bestX, u.viewMinX, u.viewMaxX);
+let owner = (pixelMinX <= cx && cx < pixelMaxX) || (outputIdx + 1u == maxCols && cx >= pixelMaxX);
+if (!owner) {
+barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
+return;
+}
 let seriesCount = max(1u, u.seriesCount);
 let barOffset = (f32(seriesIdx.index) - f32(seriesCount - 1u) * 0.5) * (bestHW * 2.0);
 let offsetX = bestX + barOffset;
@@ -134,6 +147,7 @@ barData[outputIdx] = BarData(normX, dataMinY, dataMaxY, bw);
 `;
 
 export const BOX_RENDER_SHADER = `${UNIFORM_STRUCT}
+${BAR_UNIFORMS}
 struct BarData {
 screenX: f32,
 minY: f32,
@@ -143,6 +157,7 @@ barWidth: f32,
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read> barData: array<BarData>;
 @group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(3) var<uniform> bu: BarUniforms;
 struct VertexOutput {
 @builtin(position) pos: vec4f,
 @location(0) normY: f32,
@@ -191,6 +206,6 @@ return out;
 }
 @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
 let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 0.85);
+return vec4f(series.color.rgb, bu.barOpacity);
 }
 `;
