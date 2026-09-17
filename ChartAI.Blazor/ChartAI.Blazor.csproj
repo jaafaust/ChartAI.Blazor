@@ -47,6 +47,48 @@
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 
+  <!-- chartai engine: wwwroot/chartai.js is generated from the TypeScript in engine/src by
+       engine/build.ts (Bun, https://bun.sh). The bundle is committed, so a build without Bun
+       still works; when Bun is on the PATH and a source is newer than the bundle, the bundle is
+       rebuilt before the .NET build. Skip with -p:ChartAiSkipEngineBuild=true. -->
+  <PropertyGroup>
+    <ChartAiEngineDir>$(MSBuildProjectDirectory)/engine</ChartAiEngineDir>
+    <ChartAiEngineBundle>$(MSBuildProjectDirectory)/wwwroot/chartai.js</ChartAiEngineBundle>
+    <DefaultItemExcludes>$(DefaultItemExcludes);engine/node_modules/**;engine/.build/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ChartAiEngineSource Include="$(ChartAiEngineDir)/src/**/*.ts;$(ChartAiEngineDir)/build.ts"
+                         Exclude="$(ChartAiEngineDir)/src/worker-inline.ts" />
+    <!-- The SDK's default Content glob would otherwise ship engine/*.json as contentFiles of the
+         NuGet package. Nothing under engine/ belongs in the package; the sources stay visible in
+         the IDE as None items. -->
+    <Content Remove="engine/**" />
+    <None Include="engine/package.json;engine/tsconfig.json;engine/bun.lock" />
+  </ItemGroup>
+
+  <Target Name="BuildChartAiEngine"
+          BeforeTargets="BeforeBuild"
+          Inputs="@(ChartAiEngineSource)"
+          Outputs="$(ChartAiEngineBundle)"
+          Condition="'$(ChartAiSkipEngineBuild)' != 'true'">
+    <Exec Command="bun --version"
+          IgnoreExitCode="true"
+          IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          EchoOff="true">
+      <Output TaskParameter="ExitCode" PropertyName="_ChartAiBunExitCode" />
+    </Exec>
+    <Warning Condition="'$(_ChartAiBunExitCode)' != '0'"
+             Text="engine/src is newer than wwwroot/chartai.js but Bun is not installed, so the committed bundle is used as is. Install Bun (https://bun.sh) and rebuild, or run 'bun run build.ts' in $(ChartAiEngineDir)." />
+    <Message Condition="'$(_ChartAiBunExitCode)' == '0'" Importance="high"
+             Text="Building wwwroot/chartai.js from engine/src with Bun" />
+    <Exec Condition="'$(_ChartAiBunExitCode)' == '0'"
+          Command="bun run build.ts"
+          WorkingDirectory="$(ChartAiEngineDir)" />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.8" />
   </ItemGroup>

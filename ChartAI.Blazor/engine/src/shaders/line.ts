@@ -1,0 +1,187 @@
+import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
+
+// A sample of -3e38 (GPU_GAP in chart-library.ts) marks a missing value: the column is left
+// empty and neighbouring columns do not connect across it.
+
+export const LINE_COMPUTE_SHADER = `${UNIFORM_STRUCT}
+struct LineUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
+struct LineData {
+screenX: f32,
+minScreenY: f32,
+maxScreenY: f32,
+valid: f32,
+};
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var<storage, read> dataX: array<f32>;
+@group(0) @binding(2) var<storage, read> dataY: array<f32>;
+@group(0) @binding(3) var<storage, read_write> lineData: array<LineData>;
+@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(5) var<uniform> lu: LineUniforms;
+${BINARY_SEARCH}
+@compute @workgroup_size(${COMPUTE_WG})
+fn main(@builtin(global_invocation_id) id: vec3u) {
+let outputIdx = id.x;
+let maxCols = u32(u.width);
+let count = u.pointCount;
+if (outputIdx >= maxCols || count == 0u) {
+if (outputIdx < maxCols) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+}
+return;
+}
+let viewRangeX = u.viewMaxX - u.viewMinX;
+let viewRangeY = u.viewMaxY - u.viewMinY;
+if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
+let relPx = f32(outputIdx);
+let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
+let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
+if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
+let startIdx = lowerBound(pixelMinX, count);
+var endIdx = lowerBound(pixelMaxX, count);
+endIdx = min(endIdx, count);
+let centerX = (pixelMinX + pixelMaxX) * 0.5;
+if (startIdx >= endIdx) {
+var bestIdx = startIdx;
+if (startIdx > 0u && startIdx < count) {
+let distPrev = abs(dataX[startIdx - 1u] - centerX);
+let distCurr = abs(dataX[startIdx] - centerX);
+if (distPrev < distCurr) {
+bestIdx = startIdx - 1u;
+}
+} else if (startIdx >= count && count > 0u) {
+bestIdx = count - 1u;
+}
+// The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
+// edge is drawn even when the half nearer to that neighbour lies entirely off screen.
+if (outputIdx == 0u && startIdx > 0u) {
+bestIdx = startIdx - 1u;
+}
+if (outputIdx + 1u == maxCols && startIdx < count) {
+bestIdx = startIdx;
+}
+if (bestIdx >= count) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
+let y = dataY[bestIdx];
+if (y < -1.0e38) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
+let normY = (y - u.viewMinY) / viewRangeY;
+let screenY = 1.0 - normY;
+let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
+let screenX = normX;
+lineData[outputIdx] = LineData(screenX, screenY, screenY, 1.0);
+return;
+}
+var dataMinY = 3.0e38;
+var dataMaxY = -3.0e38;
+let rangeCount = endIdx - startIdx;
+let maxSamples = lu.maxSamplesPerPixel;
+if (maxSamples > 1u && rangeCount > maxSamples) {
+let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
+for (var s = 0u; s < maxSamples; s++) {
+let idx = startIdx + u32(f32(s) * stride);
+if (idx < endIdx) {
+let y = dataY[idx];
+if (y > -1.0e38) {
+dataMinY = min(dataMinY, y);
+dataMaxY = max(dataMaxY, y);
+}
+}
+}
+let lastY = dataY[endIdx - 1u];
+if (lastY > -1.0e38) {
+dataMinY = min(dataMinY, lastY);
+dataMaxY = max(dataMaxY, lastY);
+}
+} else {
+for (var i = startIdx; i < endIdx; i++) {
+let y = dataY[i];
+if (y > -1.0e38) {
+dataMinY = min(dataMinY, y);
+dataMaxY = max(dataMaxY, y);
+}
+}
+}
+if (dataMaxY < dataMinY) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
+// The vertex of a column that holds samples sits at the middle of those samples, not at the
+// pixel centre: the empty columns on either side collapse onto their nearest sample, so a
+// vertex left or right of that sample folds the strip back over itself and the overlap
+// shows as a darker seam wherever the fill is blended.
+let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
+let screenX = normX;
+let normMaxY = (dataMaxY - u.viewMinY) / viewRangeY;
+let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
+let minScreenY = 1.0 - normMaxY;
+let maxScreenY = 1.0 - normMinY;
+lineData[outputIdx] = LineData(screenX, minScreenY, maxScreenY, 1.0);
+}
+`;
+
+export const LINE_RENDER_SHADER = `${UNIFORM_STRUCT}
+struct LineData {
+screenX: f32,
+minScreenY: f32,
+maxScreenY: f32,
+valid: f32,
+};
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var<storage, read> lineData: array<LineData>;
+@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
+struct VertexOutput {
+@builtin(position) pos: vec4f,
+@location(0) alpha: f32,
+@location(1) @interpolate(flat) seriesIdx: u32,
+};
+@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
+var out: VertexOutput;
+out.seriesIdx = series_idx;
+let maxCols = u32(u.width);
+let segIdx = vi / 2u;
+let endpoint = vi % 2u;
+if (segIdx < maxCols) {
+let d = lineData[segIdx];
+let y = select(d.maxScreenY, d.minScreenY, endpoint == 0u);
+out.pos = vec4f(d.screenX * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, d.valid);
+out.alpha = d.valid;
+} else {
+let connIdx = segIdx - maxCols;
+if (connIdx + 1u >= maxCols) {
+out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
+out.alpha = 0.0;
+return out;
+}
+let d0 = lineData[connIdx];
+let d1 = lineData[connIdx + 1u];
+let segValid = min(d0.valid, d1.valid);
+if (endpoint == 0u) {
+let midY = (d0.minScreenY + d0.maxScreenY) * 0.5;
+out.pos = vec4f(d0.screenX * 2.0 - 1.0, 1.0 - midY * 2.0, 0.0, segValid);
+} else {
+let midY = (d1.minScreenY + d1.maxScreenY) * 0.5;
+out.pos = vec4f(d1.screenX * 2.0 - 1.0, 1.0 - midY * 2.0, 0.0, segValid);
+}
+out.alpha = segValid;
+}
+return out;
+}
+@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
+if (in.alpha < 0.1) { discard; }
+let series = allSeries[in.seriesIdx];
+// Every series but the hovered one steps back toward the background while a highlight is
+// set; mixed into the colour rather than the alpha, since the line passes do not blend.
+let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
+return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
+}
+`;

@@ -1,42 +1,5 @@
-var __defProp = Object.defineProperty;
-var __returnValue = (v) => v;
-function __exportSetter(name, newValue) {
-  this[name] = __returnValue.bind(null, newValue);
-}
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, {
-      get: all[name],
-      enumerable: true,
-      configurable: true,
-      set: __exportSetter.bind(all, name)
-    });
-};
-
 // src/worker-inline.ts
-var exports_worker_inline = {};
-__export(exports_worker_inline, {
-  WORKER_CODE: () => WORKER_CODE
-});
-var WORKER_CODE = `var k=\`fn luma(c:vec4f)->f32{return dot(c.rgb,vec3f(.299,.587,.114));}
-fn laaa(uv:vec2f,t:texture_2d<f32>,s:sampler)->vec4f{
-let r=1./vec2f(textureDimensions(t));let m=textureSample(t,s,uv);
-let n=textureSample(t,s,uv+vec2f(0.,-r.y));let e=textureSample(t,s,uv+vec2f(r.x,0.));
-let w=textureSample(t,s,uv+vec2f(-r.x,0.));let sv=textureSample(t,s,uv+vec2f(0.,r.y));
-let lm=luma(m);let ln=luma(n);let le=luma(e);let lw=luma(w);let ls=luma(sv);
-let lo=min(lm,min(min(ln,ls),min(le,lw)));let hi=max(lm,max(max(ln,ls),max(le,lw)));
-let rng=hi-lo;if(rng<max(.0833,hi*.166)){return m;}
-return mix(m,(m+n+e+w+sv)*.2,min(rng*3.,1.));}
-struct BV{@builtin(position)p:vec4f,@location(0)uv:vec2f}
-@group(0)@binding(0)var inputTex:texture_2d<f32>;
-@group(0)@binding(1)var samp:sampler;
-@vertex fn vs(@builtin(vertex_index)i:u32)->BV{
-var p=array<vec2f,4>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(1,1));
-var u=array<vec2f,4>(vec2f(0,1),vec2f(1,1),vec2f(0,0),vec2f(1,0));
-return BV(vec4f(p[i],0,1),u[i]);}
-@fragment fn fs(v:BV)->@location(0)vec4f{return laaa(v.uv,inputTex,samp);}
-\`;var T={INIT:0,THEME:1,REGISTER_RENDERER:2,REGISTER_CHART:3,UNREGISTER_CHART:4,UPDATE_SERIES:5,RESIZE:6,VIEW_TRANSFORM:7,BATCH_VIEW_TRANSFORM:8,SET_VISIBILITY:9,SET_STYLE:10,SET_UNIFORMS:11,GPU_READY:12,ERROR:13,STATS:14,PATCH_SERIES:15,SET_BOUNDS:16},Q={NO_GPU:"e1:no-gpu",NO_ADAPTER:"e2:no-adapter",DEVICE_LOST:"e3:device-lost",NOT_READY:"e4:not-ready",COMPILE:"e5:compile",CTX_GET:"e6:ctx-get",CTX_CFG:"e7:ctx-cfg",TEX:"e8:tex",BIND_S:"e9:bind-s",BIND_C:"e10:bind-c",UPDATE:"e11:update",NO_RENDERER:"e12:no-renderer",RESIZE:"e13:resize"};var j,U,J=new Map,R=new Map,w=!1,I,B,l,P=0,M=0,C=!1,p=null,L=new ArrayBuffer(80),b=new Float32Array(L),n=new Uint32Array(L);function D(_){let O=GPUBufferUsage.COPY_DST;for(let N of _)switch(N.toUpperCase()){case"STORAGE":O|=GPUBufferUsage.STORAGE;break;case"VERTEX":O|=GPUBufferUsage.VERTEX;break;case"UNIFORM":O|=GPUBufferUsage.UNIFORM;break;case"COPY_SRC":O|=GPUBufferUsage.COPY_SRC;break;case"COPY_DST":O|=GPUBufferUsage.COPY_DST;break;case"INDEX":O|=GPUBufferUsage.INDEX;break;case"INDIRECT":O|=GPUBufferUsage.INDIRECT;break}return O}function i(_,O,N){let m=N==="compute"?GPUShaderStage.COMPUTE:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT;if(_==="uniforms"||_==="custom-uniforms"||_==="series-index")return{visibility:m,buffer:{type:"uniform"}};if(_==="render-target"){if(O)return{visibility:GPUShaderStage.COMPUTE,storageTexture:{access:"write-only",format:"rgba8unorm"}};return{visibility:m,texture:{sampleType:"float"}}}if(O)return{visibility:m,buffer:{type:"storage"}};return{visibility:m,buffer:{type:"read-only-storage"}}}function z(_,O,N,m,W){switch(_){case"uniforms":return{buffer:N.uniformBuffer};case"custom-uniforms":return{buffer:N.customUniformBuffer};case"series-info":return{buffer:N.seriesStorageBuffer};case"render-target":return N.outputTextureView;case"x-data":return{buffer:m.dataX};case"y-data":return{buffer:m.dataY};case"series-index":return{buffer:m.seriesIndexBuffer}}if(_.endsWith("-data")){let Y=_.slice(0,-5);return{buffer:m.extraBuffers.get(Y)}}if(W.config.bufferDefs.find((Y)=>Y.name===_)?.perSeries)return{buffer:m.seriesBuffers.get(_)};return{buffer:N.chartBuffers.get(_)}}function d(_){let O=new Map,N=new Map,ms=!_.passes.some((v)=>v.type==="compute"&&v.bindings.some((b)=>b.source==="render-target"&&b.write));for(let m=0;m<_.passes.length;m++){let W=_.passes[m],X=W.bindings.map((v)=>({binding:v.binding,...i(v.source,v.write,W.type)})),Y=j.createBindGroupLayout({entries:X});N.set(\`pass-\${m}\`,Y);let H=j.createPipelineLayout({bindGroupLayouts:[Y]}),G=j.createShaderModule({code:_.shaders[W.shader]});if(W.type==="compute")O.set(\`pass-\${m}\`,j.createComputePipeline({layout:H,compute:{module:G,entryPoint:"main"}}));else O.set(\`pass-\${m}\`,j.createRenderPipeline({layout:H,vertex:{module:G,entryPoint:"vs"},fragment:{module:G,entryPoint:"fs",targets:[{format:"rgba8unorm",blend:W.blend}]},primitive:{topology:W.topology??"triangle-list"},multisample:{count:ms?4:1}}))}return{config:_,pipelines:O,passLayouts:N,msaa:ms,hl:_.passes.findIndex((v)=>v.highlight)}}function h(_){if(!_.seriesStorageBuffer||_.series.length===0)return;let O=new Float32Array(_.series.length*8),N=new Uint32Array(O.buffer);for(let m=0;m<_.series.length;m++){let W=_.series[m],X=m*8;O[X+0]=W.colorR,O[X+1]=W.colorG,O[X+2]=W.colorB,O[X+3]=1,N[X+4]=W.visibleStart,N[X+5]=W.visibleCount}j.queue.writeBuffer(_.seriesStorageBuffer,0,O)}function E(_,O){let N=b,m=n,W=_.maxX-_.minX,X=_.maxY-_.minY,Y=_.bgColor??(w?[0.11,0.11,0.12]:[0.98,0.98,0.98]);N[0]=_.width,N[1]=_.height,N[2]=_.minX+_.panX*W,N[3]=_.minX+_.panX*W+W/_.zoomX,N[4]=_.minY+_.panY*X,N[5]=_.minY+_.panY*X+X/_.zoomY,m[6]=O.pointCount,m[7]=_.series.length,m[8]=w?1:0,N[9]=Y[0],N[10]=Y[1],N[11]=Y[2],N[12]=_.minX,N[13]=_.maxX,N[14]=_.minY,N[15]=_.maxY,m[16]=(_.hlSeries??-1)>>>0,j.queue.writeBuffer(_.uniformBuffer,0,L)}function y(_,O){if(!_.customUniformBuffer||O.uniformDefs.length===0)return;let N=O.uniformDefs.length,m=Math.ceil(N*4/16)*16,W=new ArrayBuffer(m),X=new Float32Array(W),Y=new Uint32Array(W);for(let H=0;H<N;H++){let G=O.uniformDefs[H],v=_.customUniformValues[G.name]??G.default;if(G.type==="u32")Y[H]=v>>>0;else X[H]=v}j.queue.writeBuffer(_.customUniformBuffer,0,W)}function g(_,O,N){for(let[,m]of _.chartBuffers)m.destroy();_.chartBuffers.clear();for(let m of O.config.bufferDefs)if(!m.perSeries){let W=Math.max(16,N[m.name]??16);_.chartBuffers.set(m.name,j.createBuffer({size:W,usage:D(m.usages)}))}if(O.config.uniformDefs.length>0){if(_.customUniformBuffer)_.customUniformBuffer.destroy();let m=Math.max(16,Math.ceil(O.config.uniformDefs.length*4/16)*16);_.customUniformBuffer=j.createBuffer({size:m,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),y(_,O.config)}}function u(_,O,N,m){for(let[,W]of _.seriesBuffers)W.destroy();_.seriesBuffers.clear();for(let W of N.config.bufferDefs)if(W.perSeries){let X=Math.max(16,m[W.name]??16);_.seriesBuffers.set(W.name,j.createBuffer({size:X,usage:D(W.usages)}))}if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy();_.seriesIndexBuffer=j.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),j.queue.writeBuffer(_.seriesIndexBuffer,0,new Uint32Array([O,0,0,0]))}function f(_,O){if(!_.seriesStorageBuffer)return;for(let N=0;N<_.series.length;N++){let m=_.series[N];m.passBindGroups=[],m.hlBindGroup=null;for(let W=0;W<O.config.passes.length;W++){let X=O.config.passes[W];if(!X.perSeries||X.highlight){m.passBindGroups.push(null);continue}let Y=O.passLayouts.get(\`pass-\${W}\`);try{let H=X.bindings.map((G)=>({binding:G.binding,resource:z(G.source,G.write,_,m,O)}));m.passBindGroups.push(j.createBindGroup({layout:Y,entries:H}))}catch(H){postMessage({type:T.ERROR,code:Q.BIND_S,message:String(H)}),m.passBindGroups.push(null)}}}_.chartPassBindGroups=[];for(let N=0;N<O.config.passes.length;N++){let m=O.config.passes[N];if(m.perSeries){_.chartPassBindGroups.push(null);continue}let W=O.passLayouts.get(\`pass-\${N}\`);try{let X=m.bindings.map((Y)=>({binding:Y.binding,resource:z(Y.source,Y.write,_,null,O)}));_.chartPassBindGroups.push(j.createBindGroup({layout:W,entries:X}))}catch(X){postMessage({type:T.ERROR,code:Q.BIND_C,message:String(X)}),_.chartPassBindGroups.push(null)}}}function S(_){if(_.outputTexture)_.outputTexture.destroy();let O=Math.max(1,_.width),N=Math.max(1,_.height),m=R.get(_.rendererName),W=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT;if(m){for(let X of m.config.passes)if(X.type==="compute"){for(let Y of X.bindings)if(Y.source==="render-target"&&Y.write){W|=GPUTextureUsage.STORAGE_BINDING;break}}}_.outputTexture=j.createTexture({size:[O,N],format:"rgba8unorm",usage:W}),_.outputTextureView=_.outputTexture.createView(),_.blitBindGroup=j.createBindGroup({layout:B,entries:[{binding:0,resource:_.outputTextureView},{binding:1,resource:l}]});if(_.msaaTexture)_.msaaTexture.destroy(),_.msaaTexture=null,_.msaaView=null;if(m&&m.msaa)_.msaaTexture=j.createTexture({size:[O,N],format:"rgba8unorm",sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT}),_.msaaView=_.msaaTexture.createView()}function ca(_,O){return{view:_.msaaView??_.outputTextureView,resolveTarget:_.msaaView?_.outputTextureView:void 0,loadOp:O,storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}}function c(_){let O=R.get(_.rendererName);if(!O)return;if(!_.ctx||_.width===0||_.height===0||_.series.length===0)return;if(O.msaa&&!_.msaaView)S(_);let hs=_.highlight??-1;if(O.hl<0||hs<0||hs>=_.series.length||_.series[hs].hidden||_.series[hs].pointCount===0)hs=-1;_.hlSeries=hs;let N;try{N=_.ctx.getCurrentTexture().createView()}catch{return}let m=j.createCommandEncoder();if(h(_),_.series.length>0)E(_,_.series[0]);m.beginRenderPass({colorAttachments:[ca(_,"clear")]}).end();for(let Y=0;Y<O.config.passes.length;Y++){let H=O.config.passes[Y],G=O.pipelines.get(\`pass-\${Y}\`);if(!G||H.highlight)continue;if(H.type==="compute")if(H.perSeries)for(let v=0;v<_.series.length;v++){let V=_.series[v];if(V.pointCount===0||V.hidden)continue;E(_,V);let q=_.perSeriesPassMeta[v]?.[Y]?.dispatch??{x:1},$=V.passBindGroups[Y];if(!$)continue;let Z=m.beginComputePass();Z.setPipeline(G),Z.setBindGroup(0,$),Z.dispatchWorkgroups(q.x,q.y??1,q.z??1),Z.end()}else{let v=_.chartPassBindGroups[Y];if(!v)continue;let K=_.perSeriesPassMeta[0]?.[Y]?.dispatch??{x:1},q=m.beginComputePass();q.setPipeline(G),q.setBindGroup(0,v),q.dispatchWorkgroups(K.x,K.y??1,K.z??1),q.end()}else if(H.type==="render"){let V=_.perSeriesPassMeta[0]?.[Y]?.draw??0,K=m.beginRenderPass({colorAttachments:[ca(_,H.loadOp??"load")]});if(K.setPipeline(G),H.perSeries)for(let q=0;q<_.series.length;q++){let $=_.series[q];if($.pointCount===0||$.hidden)continue;let Z=$.passBindGroups[Y];if(!Z)continue;K.setBindGroup(0,Z),K.draw(V,1,0,q)}else{let q=_.chartPassBindGroups[Y];if(q)K.setBindGroup(0,q),K.draw(V,1,0,0)}K.end()}}if(hs>=0){let Y=O.hl,H=O.config.passes[Y],G=O.pipelines.get("pass-"+Y),V=_.series[hs];if(G&&!V.hlBindGroup)try{V.hlBindGroup=j.createBindGroup({layout:O.passLayouts.get("pass-"+Y),entries:H.bindings.map((b)=>({binding:b.binding,resource:z(b.source,b.write,_,V,O)}))})}catch(e){postMessage({type:T.ERROR,code:Q.BIND_S,message:String(e)})}if(G&&V.hlBindGroup){let n=_.perSeriesPassMeta[hs]?.[Y]?.draw??0,K=m.beginRenderPass({colorAttachments:[ca(_,"load")]});K.setPipeline(G),K.setBindGroup(0,V.hlBindGroup),K.draw(n,1,0,hs),K.end()}}let X=m.beginRenderPass({colorAttachments:[{view:N,loadOp:"clear",storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}]});if(X.setPipeline(I),_.blitBindGroup)X.setBindGroup(0,_.blitBindGroup);X.draw(4),X.end(),j.queue.submit([m.finish()])}function F(){if(!C)C=!0,requestAnimationFrame(t)}function A(_){if(_.dirty=!0,_.visible)F()}function s(){let _=!1;for(let O of J.values())if(O.dirty=!0,O.visible)_=!0;if(_)F()}function t(){C=!1;let _=performance.now();for(let O of J.values())if(O.visible&&O.dirty&&O.width>0)c(O),O.dirty=!1;M=performance.now()-_,P++}function e(){let _=0;for(let O of J.values())if(O.visible&&O.width>0)_++;return _}async function a(){if(j)return!0;if(!navigator.gpu)return postMessage({type:T.ERROR,code:Q.NO_GPU}),!1;let _=await navigator.gpu.requestAdapter();if(!_)return postMessage({type:T.ERROR,code:Q.NO_ADAPTER}),!1;j=await _.requestDevice({requiredLimits:{maxBufferSize:_.limits.maxBufferSize,maxStorageBufferBindingSize:_.limits.maxStorageBufferBindingSize}}),U=navigator.gpu.getPreferredCanvasFormat(),j.lost.then((N)=>{postMessage({type:T.ERROR,code:Q.DEVICE_LOST})}),B=j.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:"float"}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});let O=j.createShaderModule({code:k});return I=j.createRenderPipeline({layout:j.createPipelineLayout({bindGroupLayouts:[B]}),vertex:{module:O,entryPoint:"vs"},fragment:{module:O,entryPoint:"fs",targets:[{format:U}]},primitive:{topology:"triangle-strip"}}),l=j.createSampler({magFilter:"linear",minFilter:"linear"}),p=setInterval(()=>{postMessage({type:T.STATS,fps:P,renderMs:M,totalCharts:J.size,activeCharts:e()}),P=0},1000),postMessage({type:T.GPU_READY}),!0}function o(_){if(_.ownsX!==!1)_.dataX.destroy();_.dataY.destroy();for(let[,O]of _.extraBuffers)O.destroy();for(let[,O]of _.seriesBuffers)O.destroy();if(_.seriesIndexBuffer)_.seriesIndexBuffer.destroy()}function r(_,O,N,m,W,cap,sx){let X=J.get(_);if(!X||!j)return;let Y=R.get(X.rendererName);if(!Y){postMessage({type:T.ERROR,code:Q.NO_RENDERER});return}try{X.minX=N.minX,X.maxX=N.maxX,X.minY=N.minY,X.maxY=N.maxY,X.perSeriesPassMeta=W;for(let H of X.series)o(H);if(X.sharedX)X.sharedX.destroy(),X.sharedX=null;if(X.series=[],X.seriesStorageBuffer)X.seriesStorageBuffer.destroy();if(O.length>0)X.seriesStorageBuffer=j.createBuffer({size:Math.max(32,O.length*32),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});g(X,Y,m);let US=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST,mk=(len)=>j.createBuffer({size:Math.max(16,Math.max(cap||0,len)*4),usage:US});if(sx)X.sharedX=mk(sx.length),j.queue.writeBuffer(X.sharedX,0,sx);X.capacity=Math.max(cap||0,sx?sx.length:0);for(let H=0;H<O.length;H++){let G=O[H],v;if(sx)v=X.sharedX;else v=mk(G.dataX.length),j.queue.writeBuffer(v,0,G.dataX);let V=mk(G.dataY.length);j.queue.writeBuffer(V,0,G.dataY);let K=new Map;for(let[$,Z]of Object.entries(G.extra??{})){let x=mk(Z.length);j.queue.writeBuffer(x,0,Z),K.set($,x)}let n=G.dataY.length,q={label:G.label,colorR:G.colorR,colorG:G.colorG,colorB:G.colorB,dataX:v,ownsX:!sx,dataY:V,extraBuffers:K,seriesBuffers:new Map,seriesIndexBuffer:null,pointCount:n,visibleStart:0,visibleCount:n,hidden:G.hidden??!1,passBindGroups:[]};X.series.push(q),u(q,H,Y,m)}f(X,Y)}catch(H){postMessage({type:T.ERROR,code:Q.UPDATE,message:String(H)})}}self.onmessage=async(_)=>{let{type:O,...N}=_.data;switch(O){case T.INIT:w=N.isDark||!1,await a();break;case T.THEME:w=N.isDark,s();break;case T.REGISTER_RENDERER:{if(!j){postMessage({type:T.ERROR,code:Q.NOT_READY});break}let m={name:N.name,shaders:N.shaders,passes:N.passes,bufferDefs:N.bufferDefs??[],uniformDefs:N.uniformDefs??[]};try{R.set(N.name,d(m))}catch(W){postMessage({type:T.ERROR,code:Q.COMPILE})}break}case T.REGISTER_CHART:{if(!j)break;let m=N.canvas.getContext("webgpu");if(!m){postMessage({type:T.ERROR,code:Q.CTX_GET});break}try{m.configure({device:j,format:U,alphaMode:"premultiplied"})}catch(G){postMessage({type:T.ERROR,code:Q.CTX_CFG});break}let W=j.limits.maxTextureDimension2D,X=Math.min(Math.max(1,Math.floor(Number(N.canvas.width)||800)),W),Y=Math.min(Math.max(1,Math.floor(Number(N.canvas.height)||400)),W),H={id:N.id,canvas:N.canvas,ctx:m,rendererName:N.rendererName,visible:!0,series:[],uniformBuffer:j.createBuffer({size:80,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),seriesStorageBuffer:null,outputTexture:null,outputTextureView:null,msaaTexture:null,msaaView:null,blitBindGroup:null,chartBuffers:new Map,customUniformBuffer:null,customUniformValues:N.customUniformValues??{},chartPassBindGroups:[],perSeriesPassMeta:N.perSeriesPassMeta??[],width:X,height:Y,panX:0,panY:0,zoomX:1,zoomY:1,minX:0,maxX:1,maxY:1,minY:0,bgColor:N.bgColor??null,highlight:-1,dirty:!0};try{S(H)}catch(G){postMessage({type:T.ERROR,code:Q.TEX});break}J.set(N.id,H);break}case T.UNREGISTER_CHART:{let m=J.get(N.id);if(m){try{m.ctx.unconfigure()}catch{}if(m.uniformBuffer.destroy(),m.seriesStorageBuffer)m.seriesStorageBuffer.destroy();if(m.outputTexture)m.outputTexture.destroy();if(m.msaaTexture)m.msaaTexture.destroy();if(m.customUniformBuffer)m.customUniformBuffer.destroy();for(let[,W]of m.chartBuffers)W.destroy();for(let W of m.series)o(W);if(m.sharedX)m.sharedX.destroy();J.delete(N.id)}break}case T.UPDATE_SERIES:{r(N.id,N.series,N.bounds,N.bufferSizes??{},N.perSeriesPassMeta??[],N.capacity,N.sharedX);let m=J.get(N.id);if(m)A(m);break}case T.PATCH_SERIES:{let m=J.get(N.id);if(!m||!j)break;try{let off=N.offset|0,k=N.k|0,S=m.series.length,P=N.packed,ex=N.extra||[];if(N.bounds)m.minX=N.bounds.minX,m.maxX=N.bounds.maxX,m.minY=N.bounds.minY,m.maxY=N.bounds.maxY;if(N.x&&k>0){if(m.sharedX)j.queue.writeBuffer(m.sharedX,off*4,N.x);else for(let s of m.series)j.queue.writeBuffer(s.dataX,off*4,N.x)}if(P&&k>0)for(let i=0;i<S;i++){let s=m.series[i];j.queue.writeBuffer(s.dataY,off*4,P,i*k,k);for(let e=0;e<ex.length;e++){let b=s.extraBuffers.get(ex[e]);if(b)j.queue.writeBuffer(b,off*4,P,((e+1)*S+i)*k,k)}}for(let s of m.series)s.pointCount=N.count,s.visibleCount=N.count}catch(H){postMessage({type:T.ERROR,code:Q.UPDATE,message:String(H)})}A(m);break}case T.SET_BOUNDS:{let m=J.get(N.id);if(m)m.minX=N.bounds.minX,m.maxX=N.bounds.maxX,m.minY=N.bounds.minY,m.maxY=N.bounds.maxY,A(m);break}case T.RESIZE:{let m=J.get(N.id);if(!m||N.width<=0||N.height<=0)break;let W=j.limits.maxTextureDimension2D,X=Math.min(N.width,W),Y=Math.min(N.height,W);if(X===m.width&&Y===m.height)break;if(m.width=X,m.height=Y,m.canvas.width=X,m.canvas.height=Y,N.perSeriesPassMeta?.length>0)m.perSeriesPassMeta=N.perSeriesPassMeta;let H=R.get(m.rendererName);try{if(S(m),H&&N.bufferSizes){g(m,H,N.bufferSizes);for(let G=0;G<m.series.length;G++)u(m.series[G],G,H,N.bufferSizes);f(m,H)}}catch(G){postMessage({type:T.ERROR,code:Q.RESIZE,message:String(G)})}A(m);break}case T.VIEW_TRANSFORM:{let m=J.get(N.id);if(m)m.panX=N.panX,m.panY=N.panY,m.zoomX=Math.max(0.1,Math.min(1e6,N.zoomX)),m.zoomY=Math.max(0.1,Math.min(1e6,N.zoomY)),A(m);break}case T.BATCH_VIEW_TRANSFORM:{let m=Math.max(0.1,Math.min(1e6,N.zoomX)),W=Math.max(0.1,Math.min(1e6,N.zoomY));for(let X of N.transforms){let Y=J.get(X.id);if(Y)Y.panX=N.panX,Y.panY=N.panY,Y.zoomX=m,Y.zoomY=W,Y.dirty=!0}F();break}case T.SET_VISIBILITY:{let m=J.get(N.id);if(m){if(m.visible=N.visible,N.visible&&m.dirty)F()}break}case T.SET_STYLE:{let m=J.get(N.id);if(m){if(N.bgColor!==void 0)m.bgColor=N.bgColor;if(N.highlightSeries!==void 0)m.highlight=N.highlightSeries;if(N.hiddenSeries!==void 0)for(let W=0;W<m.series.length;W++)m.series[W].hidden=N.hiddenSeries.has(W);A(m)}break}case T.SET_UNIFORMS:{let m=J.get(N.id);if(!m)break;Object.assign(m.customUniformValues,N.values);let W=R.get(m.rendererName);if(W)y(m,W.config);A(m);break}}};
-`;
+var WORKER_CODE = 'var Y="fn luma(c:vec4f)->f32{return dot(c.rgb,vec3f(.299,.587,.114));}fn laaa(uv:vec2f,t:texture_2d<f32>,s:sampler)->vec4f{let r=1./vec2f(textureDimensions(t));let m=textureSample(t,s,uv);let n=textureSample(t,s,uv+vec2f(0.,-r.y));let e=textureSample(t,s,uv+vec2f(r.x,0.));let w=textureSample(t,s,uv+vec2f(-r.x,0.));let sv=textureSample(t,s,uv+vec2f(0.,r.y));let lm=luma(m);let ln=luma(n);let le=luma(e);let lw=luma(w);let ls=luma(sv);let lo=min(lm,min(min(ln,ls),min(le,lw)));let hi=max(lm,max(max(ln,ls),max(le,lw)));let rng=hi-lo;if(rng<max(.0833,hi*.166)){return m;}return mix(m,(m+n+e+w+sv)*.2,min(rng*3.,1.));}struct BV{@builtin(position)p:vec4f,@location(0)uv:vec2f}@group(0)@binding(0)var inputTex:texture_2d<f32>;@group(0)@binding(1)var samp:sampler;@vertex fn vs(@builtin(vertex_index)i:u32)->BV{var p=array<vec2f,4>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(1,1));var u=array<vec2f,4>(vec2f(0,1),vec2f(1,1),vec2f(0,0),vec2f(1,0));return BV(vec4f(p[i],0,1),u[i]);}@fragment fn fs(v:BV)->@location(0)vec4f{return laaa(v.uv,inputTex,samp);}";var l={INIT:0,THEME:1,REGISTER_RENDERER:2,REGISTER_CHART:3,UNREGISTER_CHART:4,UPDATE_SERIES:5,RESIZE:6,VIEW_TRANSFORM:7,BATCH_VIEW_TRANSFORM:8,SET_VISIBILITY:9,SET_STYLE:10,SET_UNIFORMS:11,GPU_READY:12,ERROR:13,STATS:14,PATCH_SERIES:15,SET_BOUNDS:16},B={NO_GPU:"e1:no-gpu",NO_ADAPTER:"e2:no-adapter",DEVICE_LOST:"e3:device-lost",NOT_READY:"e4:not-ready",COMPILE:"e5:compile",CTX_GET:"e6:ctx-get",CTX_CFG:"e7:ctx-cfg",TEX:"e8:tex",BIND_S:"e9:bind-s",BIND_C:"e10:bind-c",UPDATE:"e11:update",NO_RENDERER:"e12:no-renderer",RESIZE:"e13:resize"};var u,U,b=new Map,S=new Map,P=!1,O,T,N,E=0,k=0,v=!1,Z=null,w=new ArrayBuffer(80),j=new Float32Array(w),J=new Uint32Array(w);function V(e){let s=GPUBufferUsage.COPY_DST;for(let r of e)switch(r.toUpperCase()){case"STORAGE":s|=GPUBufferUsage.STORAGE;break;case"VERTEX":s|=GPUBufferUsage.VERTEX;break;case"UNIFORM":s|=GPUBufferUsage.UNIFORM;break;case"COPY_SRC":s|=GPUBufferUsage.COPY_SRC;break;case"COPY_DST":s|=GPUBufferUsage.COPY_DST;break;case"INDEX":s|=GPUBufferUsage.INDEX;break;case"INDIRECT":s|=GPUBufferUsage.INDIRECT;break}return s}function K(e,s,r){let t=r==="compute"?GPUShaderStage.COMPUTE:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT;if(e==="uniforms"||e==="custom-uniforms"||e==="series-index")return{visibility:t,buffer:{type:"uniform"}};if(e==="render-target"){if(s)return{visibility:GPUShaderStage.COMPUTE,storageTexture:{access:"write-only",format:"rgba8unorm"}};return{visibility:t,texture:{sampleType:"float"}}}if(s)return{visibility:t,buffer:{type:"storage"}};return{visibility:t,buffer:{type:"read-only-storage"}}}function C(e,s,r,t,n){switch(e){case"uniforms":return{buffer:r.uniformBuffer};case"custom-uniforms":return{buffer:r.customUniformBuffer};case"series-info":return{buffer:r.seriesStorageBuffer};case"render-target":return r.outputTextureView;case"x-data":return{buffer:t.dataX};case"y-data":return{buffer:t.dataY};case"series-index":return{buffer:t.seriesIndexBuffer}}if(e.endsWith("-data")){let o=e.slice(0,-5);return{buffer:t.extraBuffers.get(o)}}if(n.config.bufferDefs.find((o)=>o.name===e)?.perSeries)return{buffer:t.seriesBuffers.get(e)};return{buffer:r.chartBuffers.get(e)}}function Q(e){let s=new Map,r=new Map,t=!e.passes.some((n)=>n.type==="compute"&&n.bindings.some((a)=>a.source==="render-target"&&a.write));for(let n=0;n<e.passes.length;n++){let a=e.passes[n],o=a.bindings.map((p)=>({binding:p.binding,...K(p.source,p.write,a.type)})),i=u.createBindGroupLayout({entries:o});r.set(`pass-${n}`,i);let f=u.createPipelineLayout({bindGroupLayouts:[i]}),c=u.createShaderModule({code:e.shaders[a.shader]});if(a.type==="compute")s.set(`pass-${n}`,u.createComputePipeline({layout:f,compute:{module:c,entryPoint:"main"}}));else s.set(`pass-${n}`,u.createRenderPipeline({layout:f,vertex:{module:c,entryPoint:"vs"},fragment:{module:c,entryPoint:"fs",targets:[{format:"rgba8unorm",blend:a.blend}]},primitive:{topology:a.topology??"triangle-list"},multisample:{count:t?4:1}}))}return{config:e,pipelines:s,passLayouts:r,msaa:t,hl:e.passes.findIndex((n)=>n.highlight)}}function ee(e){if(!e.seriesStorageBuffer||e.series.length===0)return;let s=new Float32Array(e.series.length*8),r=new Uint32Array(s.buffer);for(let t=0;t<e.series.length;t++){let n=e.series[t],a=t*8;s[a+0]=n.colorR,s[a+1]=n.colorG,s[a+2]=n.colorB,s[a+3]=1,r[a+4]=n.visibleStart,r[a+5]=n.visibleCount}u.queue.writeBuffer(e.seriesStorageBuffer,0,s)}function A(e,s){let r=j,t=J,n=e.maxX-e.minX,a=e.maxY-e.minY,o=e.bgColor??(P?[0.11,0.11,0.12]:[0.98,0.98,0.98]);r[0]=e.width,r[1]=e.height,r[2]=e.minX+e.panX*n,r[3]=e.minX+e.panX*n+n/e.zoomX,r[4]=e.minY+e.panY*a,r[5]=e.minY+e.panY*a+a/e.zoomY,t[6]=s.pointCount,t[7]=e.series.length,t[8]=P?1:0,r[9]=o[0],r[10]=o[1],r[11]=o[2],r[12]=e.minX,r[13]=e.maxX,r[14]=e.minY,r[15]=e.maxY,t[16]=(e.hlSeries??-1)>>>0,u.queue.writeBuffer(e.uniformBuffer,0,w)}function z(e,s){if(!e.customUniformBuffer||s.uniformDefs.length===0)return;let r=s.uniformDefs.length,t=Math.ceil(r*4/16)*16,n=new ArrayBuffer(t),a=new Float32Array(n),o=new Uint32Array(n);for(let i=0;i<r;i++){let f=s.uniformDefs[i],c=e.customUniformValues[f.name]??f.default;if(f.type==="u32")o[i]=c>>>0;else a[i]=c}u.queue.writeBuffer(e.customUniformBuffer,0,n)}function F(e,s,r){for(let[,t]of e.chartBuffers)t.destroy();e.chartBuffers.clear();for(let t of s.config.bufferDefs)if(!t.perSeries){let n=Math.max(16,r[t.name]??16);e.chartBuffers.set(t.name,u.createBuffer({size:n,usage:V(t.usages)}))}if(s.config.uniformDefs.length>0){if(e.customUniformBuffer)e.customUniformBuffer.destroy();let t=Math.max(16,Math.ceil(s.config.uniformDefs.length*4/16)*16);e.customUniformBuffer=u.createBuffer({size:t,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),z(e,s.config)}}function L(e,s,r,t){for(let[,n]of e.seriesBuffers)n.destroy();e.seriesBuffers.clear();for(let n of r.config.bufferDefs)if(n.perSeries){let a=Math.max(16,t[n.name]??16);e.seriesBuffers.set(n.name,u.createBuffer({size:a,usage:V(n.usages)}))}if(e.seriesIndexBuffer)e.seriesIndexBuffer.destroy();e.seriesIndexBuffer=u.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),u.queue.writeBuffer(e.seriesIndexBuffer,0,new Uint32Array([s,0,0,0]))}function q(e,s){if(!e.seriesStorageBuffer)return;for(let r=0;r<e.series.length;r++){let t=e.series[r];t.passBindGroups=[],t.hlBindGroup=null;for(let n=0;n<s.config.passes.length;n++){let a=s.config.passes[n];if(!a.perSeries||a.highlight){t.passBindGroups.push(null);continue}let o=s.passLayouts.get(`pass-${n}`);try{let i=a.bindings.map((f)=>({binding:f.binding,resource:C(f.source,f.write,e,t,s)}));t.passBindGroups.push(u.createBindGroup({layout:o,entries:i}))}catch(i){postMessage({type:l.ERROR,code:B.BIND_S,message:String(i)}),t.passBindGroups.push(null)}}}e.chartPassBindGroups=[];for(let r=0;r<s.config.passes.length;r++){let t=s.config.passes[r];if(t.perSeries){e.chartPassBindGroups.push(null);continue}let n=s.passLayouts.get(`pass-${r}`);try{let a=t.bindings.map((o)=>({binding:o.binding,resource:C(o.source,o.write,e,null,s)}));e.chartPassBindGroups.push(u.createBindGroup({layout:n,entries:a}))}catch(a){postMessage({type:l.ERROR,code:B.BIND_C,message:String(a)}),e.chartPassBindGroups.push(null)}}}function M(e){if(e.outputTexture)e.outputTexture.destroy();let s=Math.max(1,e.width),r=Math.max(1,e.height),t=S.get(e.rendererName),n=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT;if(t){for(let a of t.config.passes)if(a.type==="compute"){for(let o of a.bindings)if(o.source==="render-target"&&o.write){n|=GPUTextureUsage.STORAGE_BINDING;break}}}if(e.outputTexture=u.createTexture({size:[s,r],format:"rgba8unorm",usage:n}),e.outputTextureView=e.outputTexture.createView(),e.blitBindGroup=u.createBindGroup({layout:T,entries:[{binding:0,resource:e.outputTextureView},{binding:1,resource:N}]}),e.msaaTexture)e.msaaTexture.destroy(),e.msaaTexture=null,e.msaaView=null;if(t&&t.msaa)e.msaaTexture=u.createTexture({size:[s,r],format:"rgba8unorm",sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT}),e.msaaView=e.msaaTexture.createView()}function G(e,s){return{view:e.msaaView??e.outputTextureView,resolveTarget:e.msaaView?e.outputTextureView:void 0,loadOp:s,storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}}function re(e){let s=S.get(e.rendererName);if(!s)return;if(!e.ctx||e.width===0||e.height===0||e.series.length===0)return;if(s.msaa&&!e.msaaView)M(e);let r=e.highlight??-1;if(s.hl<0||r<0||r>=e.series.length||e.series[r].hidden||e.series[r].pointCount===0)r=-1;e.hlSeries=r;let t;try{t=e.ctx.getCurrentTexture().createView()}catch{return}let n=u.createCommandEncoder();if(ee(e),e.series.length>0)A(e,e.series[0]);n.beginRenderPass({colorAttachments:[G(e,"clear")]}).end();for(let i=0;i<s.config.passes.length;i++){let f=s.config.passes[i],c=s.pipelines.get(`pass-${i}`);if(!c||f.highlight)continue;if(f.type==="compute")if(f.perSeries)for(let p=0;p<e.series.length;p++){let m=e.series[p];if(m.pointCount===0||m.hidden)continue;A(e,m);let g=e.perSeriesPassMeta[p]?.[i]?.dispatch??{x:1},R=m.passBindGroups[i];if(!R)continue;let h=n.beginComputePass();h.setPipeline(c),h.setBindGroup(0,R),h.dispatchWorkgroups(g.x,g.y??1,g.z??1),h.end()}else{let p=e.chartPassBindGroups[i];if(!p)continue;let d=e.perSeriesPassMeta[0]?.[i]?.dispatch??{x:1},g=n.beginComputePass();g.setPipeline(c),g.setBindGroup(0,p),g.dispatchWorkgroups(d.x,d.y??1,d.z??1),g.end()}else if(f.type==="render"){let m=e.perSeriesPassMeta[0]?.[i]?.draw??0,d=n.beginRenderPass({colorAttachments:[G(e,f.loadOp??"load")]});if(d.setPipeline(c),f.perSeries)for(let g=0;g<e.series.length;g++){let R=e.series[g];if(R.pointCount===0||R.hidden)continue;let h=R.passBindGroups[i];if(!h)continue;d.setBindGroup(0,h),d.draw(m,1,0,g)}else{let g=e.chartPassBindGroups[i];if(g)d.setBindGroup(0,g),d.draw(m,1,0,0)}d.end()}}if(r>=0){let i=s.hl,f=s.config.passes[i],c=s.pipelines.get(`pass-${i}`),p=e.series[r];if(c&&!p.hlBindGroup)try{p.hlBindGroup=u.createBindGroup({layout:s.passLayouts.get(`pass-${i}`),entries:f.bindings.map((m)=>({binding:m.binding,resource:C(m.source,m.write,e,p,s)}))})}catch(m){postMessage({type:l.ERROR,code:B.BIND_S,message:String(m)})}if(c&&p.hlBindGroup){let m=e.perSeriesPassMeta[r]?.[i]?.draw??0,d=n.beginRenderPass({colorAttachments:[G(e,"load")]});d.setPipeline(c),d.setBindGroup(0,p.hlBindGroup),d.draw(m,1,0,r),d.end()}}let o=n.beginRenderPass({colorAttachments:[{view:t,loadOp:"clear",storeOp:"store",clearValue:{r:0,g:0,b:0,a:0}}]});if(o.setPipeline(O),e.blitBindGroup)o.setBindGroup(0,e.blitBindGroup);o.draw(4),o.end(),u.queue.submit([n.finish()])}function y(){if(!v)v=!0,requestAnimationFrame(se)}function x(e){if(e.dirty=!0,e.visible)y()}function te(){let e=!1;for(let s of b.values())if(s.dirty=!0,s.visible)e=!0;if(e)y()}function se(){v=!1;let e=performance.now();for(let s of b.values())if(s.visible&&s.dirty&&s.width>0)re(s),s.dirty=!1;k=performance.now()-e,E++}function ne(){let e=0;for(let s of b.values())if(s.visible&&s.width>0)e++;return e}async function ie(){if(u)return!0;if(!navigator.gpu)return postMessage({type:l.ERROR,code:B.NO_GPU}),!1;let e=await navigator.gpu.requestAdapter();if(!e)return postMessage({type:l.ERROR,code:B.NO_ADAPTER}),!1;u=await e.requestDevice({requiredLimits:{maxBufferSize:e.limits.maxBufferSize,maxStorageBufferBindingSize:e.limits.maxStorageBufferBindingSize}}),U=navigator.gpu.getPreferredCanvasFormat(),u.lost.then((r)=>{postMessage({type:l.ERROR,code:B.DEVICE_LOST})}),T=u.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:"float"}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});let s=u.createShaderModule({code:Y});return O=u.createRenderPipeline({layout:u.createPipelineLayout({bindGroupLayouts:[T]}),vertex:{module:s,entryPoint:"vs"},fragment:{module:s,entryPoint:"fs",targets:[{format:U}]},primitive:{topology:"triangle-strip"}}),N=u.createSampler({magFilter:"linear",minFilter:"linear"}),Z=setInterval(()=>{postMessage({type:l.STATS,fps:E,renderMs:k,totalCharts:b.size,activeCharts:ne()}),E=0},1000),postMessage({type:l.GPU_READY}),!0}function H(e){if(e.ownsX!==!1)e.dataX.destroy();e.dataY.destroy();for(let[,s]of e.extraBuffers)s.destroy();for(let[,s]of e.seriesBuffers)s.destroy();if(e.seriesIndexBuffer)e.seriesIndexBuffer.destroy()}function ae(e,s,r,t,n,a,o){let i=b.get(e);if(!i||!u)return;let f=S.get(i.rendererName);if(!f){postMessage({type:l.ERROR,code:B.NO_RENDERER});return}try{i.minX=r.minX,i.maxX=r.maxX,i.minY=r.minY,i.maxY=r.maxY,i.perSeriesPassMeta=n;for(let m of i.series)H(m);if(i.sharedX)i.sharedX.destroy(),i.sharedX=null;if(i.series=[],i.seriesStorageBuffer)i.seriesStorageBuffer.destroy();if(s.length>0)i.seriesStorageBuffer=u.createBuffer({size:Math.max(32,s.length*32),usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});F(i,f,t);let c=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST,p=(m)=>u.createBuffer({size:Math.max(16,Math.max(a||0,m)*4),usage:c});if(o)i.sharedX=p(o.length),u.queue.writeBuffer(i.sharedX,0,o);i.capacity=Math.max(a||0,o?o.length:0);for(let m=0;m<s.length;m++){let d=s[m],g;if(o)g=i.sharedX;else g=p(d.dataX.length),u.queue.writeBuffer(g,0,d.dataX);let R=p(d.dataY.length);u.queue.writeBuffer(R,0,d.dataY);let h=new Map;for(let[W,X]of Object.entries(d.extra??{})){let _=p(X.length);u.queue.writeBuffer(_,0,X),h.set(W,_)}let D=d.dataY.length,I={label:d.label,colorR:d.colorR,colorG:d.colorG,colorB:d.colorB,dataX:g,ownsX:!o,dataY:R,extraBuffers:h,seriesBuffers:new Map,seriesIndexBuffer:null,pointCount:D,visibleStart:0,visibleCount:D,hidden:d.hidden??!1,passBindGroups:[],hlBindGroup:null};i.series.push(I),L(I,m,f,t)}q(i,f)}catch(c){postMessage({type:l.ERROR,code:B.UPDATE,message:String(c)})}}self.onmessage=async(e)=>{let{type:s,...r}=e.data;switch(s){case l.INIT:P=r.isDark||!1,await ie();break;case l.THEME:P=r.isDark,te();break;case l.REGISTER_RENDERER:{if(!u){postMessage({type:l.ERROR,code:B.NOT_READY});break}let t={name:r.name,shaders:r.shaders,passes:r.passes,bufferDefs:r.bufferDefs??[],uniformDefs:r.uniformDefs??[]};try{S.set(r.name,Q(t))}catch(n){postMessage({type:l.ERROR,code:B.COMPILE})}break}case l.REGISTER_CHART:{if(!u)break;let t=r.canvas.getContext("webgpu");if(!t){postMessage({type:l.ERROR,code:B.CTX_GET});break}try{t.configure({device:u,format:U,alphaMode:"premultiplied"})}catch(f){postMessage({type:l.ERROR,code:B.CTX_CFG});break}let n=u.limits.maxTextureDimension2D,a=Math.min(Math.max(1,Math.floor(Number(r.canvas.width)||800)),n),o=Math.min(Math.max(1,Math.floor(Number(r.canvas.height)||400)),n),i={id:r.id,canvas:r.canvas,ctx:t,rendererName:r.rendererName,visible:!0,series:[],uniformBuffer:u.createBuffer({size:80,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),seriesStorageBuffer:null,outputTexture:null,outputTextureView:null,msaaTexture:null,msaaView:null,blitBindGroup:null,chartBuffers:new Map,customUniformBuffer:null,customUniformValues:r.customUniformValues??{},chartPassBindGroups:[],perSeriesPassMeta:r.perSeriesPassMeta??[],width:a,height:o,panX:0,panY:0,zoomX:1,zoomY:1,minX:0,maxX:1,maxY:1,minY:0,bgColor:r.bgColor??null,sharedX:null,capacity:0,highlight:-1,hlSeries:-1,dirty:!0};try{M(i)}catch(f){postMessage({type:l.ERROR,code:B.TEX});break}b.set(r.id,i);break}case l.UNREGISTER_CHART:{let t=b.get(r.id);if(t){try{t.ctx.unconfigure()}catch{}if(t.uniformBuffer.destroy(),t.seriesStorageBuffer)t.seriesStorageBuffer.destroy();if(t.outputTexture)t.outputTexture.destroy();if(t.msaaTexture)t.msaaTexture.destroy();if(t.customUniformBuffer)t.customUniformBuffer.destroy();for(let[,n]of t.chartBuffers)n.destroy();for(let n of t.series)H(n);if(t.sharedX)t.sharedX.destroy();b.delete(r.id)}break}case l.UPDATE_SERIES:{ae(r.id,r.series,r.bounds,r.bufferSizes??{},r.perSeriesPassMeta??[],r.capacity,r.sharedX);let t=b.get(r.id);if(t)x(t);break}case l.PATCH_SERIES:{let t=b.get(r.id);if(!t||!u)break;try{let n=r.offset|0,a=r.k|0,o=t.series.length,i=r.packed,f=r.extra||[];if(r.bounds)t.minX=r.bounds.minX,t.maxX=r.bounds.maxX,t.minY=r.bounds.minY,t.maxY=r.bounds.maxY;if(r.x&&a>0)if(t.sharedX)u.queue.writeBuffer(t.sharedX,n*4,r.x);else for(let c of t.series)u.queue.writeBuffer(c.dataX,n*4,r.x);if(i&&a>0)for(let c=0;c<o;c++){let p=t.series[c];u.queue.writeBuffer(p.dataY,n*4,i,c*a,a);for(let m=0;m<f.length;m++){let d=p.extraBuffers.get(f[m]);if(d)u.queue.writeBuffer(d,n*4,i,((m+1)*o+c)*a,a)}}for(let c of t.series)c.pointCount=r.count,c.visibleCount=r.count}catch(n){postMessage({type:l.ERROR,code:B.UPDATE,message:String(n)})}x(t);break}case l.SET_BOUNDS:{let t=b.get(r.id);if(t)t.minX=r.bounds.minX,t.maxX=r.bounds.maxX,t.minY=r.bounds.minY,t.maxY=r.bounds.maxY,x(t);break}case l.RESIZE:{let t=b.get(r.id);if(!t||r.width<=0||r.height<=0)break;let n=u.limits.maxTextureDimension2D,a=Math.min(r.width,n),o=Math.min(r.height,n);if(a===t.width&&o===t.height)break;if(t.width=a,t.height=o,t.canvas.width=a,t.canvas.height=o,r.perSeriesPassMeta?.length>0)t.perSeriesPassMeta=r.perSeriesPassMeta;let i=S.get(t.rendererName);try{if(M(t),i&&r.bufferSizes){F(t,i,r.bufferSizes);for(let f=0;f<t.series.length;f++)L(t.series[f],f,i,r.bufferSizes);q(t,i)}}catch(f){postMessage({type:l.ERROR,code:B.RESIZE,message:String(f)})}x(t);break}case l.VIEW_TRANSFORM:{let t=b.get(r.id);if(t)t.panX=r.panX,t.panY=r.panY,t.zoomX=Math.max(0.1,Math.min(1e6,r.zoomX)),t.zoomY=Math.max(0.1,Math.min(1e6,r.zoomY)),x(t);break}case l.BATCH_VIEW_TRANSFORM:{let t=Math.max(0.1,Math.min(1e6,r.zoomX)),n=Math.max(0.1,Math.min(1e6,r.zoomY));for(let a of r.transforms){let o=b.get(a.id);if(o)o.panX=r.panX,o.panY=r.panY,o.zoomX=t,o.zoomY=n,o.dirty=!0}y();break}case l.SET_VISIBILITY:{let t=b.get(r.id);if(t){if(t.visible=r.visible,r.visible&&t.dirty)y()}break}case l.SET_STYLE:{let t=b.get(r.id);if(t){if(r.bgColor!==void 0)t.bgColor=r.bgColor;if(r.highlightSeries!==void 0)t.highlight=r.highlightSeries;if(r.hiddenSeries!==void 0)for(let n=0;n<t.series.length;n++)t.series[n].hidden=r.hiddenSeries.has(n);x(t)}break}case l.SET_UNIFORMS:{let t=b.get(r.id);if(!t)break;Object.assign(t.customUniformValues,r.values);let n=S.get(t.rendererName);if(n)z(t,n.config);x(t);break}}};\n';
 
 // src/msg.ts
 var M = {
@@ -59,6 +22,71 @@ var M = {
   SET_BOUNDS: 16
 };
 
+// src/plugins/shared.ts
+var MARGIN = { left: 55, right: 10, top: 8, bottom: 45 };
+var DEFAULT_AXIS_WIDTH = 55;
+var DEFAULT_AXIS_GAP = 6;
+var Y_PLOT_CHANNELS = new Set(["open", "high", "low", "lo", "hi"]);
+function yAxisDefs(chart) {
+  const defs = chart.config.yAxes;
+  if (!Array.isArray(defs) || defs.length === 0)
+    return null;
+  return defs.map((d, i) => ({
+    id: d.id ?? String(i),
+    side: d.side === "right" ? "right" : d.side === "left" ? "left" : i === 0 ? "left" : "right",
+    width: d.width ?? DEFAULT_AXIS_WIDTH,
+    format: typeof d.format === "function" ? d.format : undefined,
+    color: d.color,
+    min: d.min,
+    max: d.max
+  }));
+}
+function hasRightAxes(chart) {
+  const defs = yAxisDefs(chart);
+  return !!defs && defs.some((d) => d.side === "right");
+}
+function chartMargin(chart) {
+  const defs = yAxisDefs(chart);
+  if (!defs)
+    return MARGIN;
+  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
+  let left = 0, right = 0, nl = 0, nr = 0;
+  for (const d of defs) {
+    if (d.side === "right")
+      right += (nr++ > 0 ? gap : 0) + d.width;
+    else
+      left += (nl++ > 0 ? gap : 0) + d.width;
+  }
+  return {
+    left: nl > 0 ? left : MARGIN.right,
+    right: nr > 0 ? right : MARGIN.right,
+    top: MARGIN.top,
+    bottom: MARGIN.bottom
+  };
+}
+function yAxisStrips(chart, m, w) {
+  const defs = yAxisDefs(chart);
+  if (!defs)
+    return null;
+  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
+  let leftEdge = m.left, rightEdge = w - m.right;
+  return defs.map((d, i) => {
+    const axis = chart.yAxes?.[i];
+    if (d.side === "right") {
+      const strip = { ...d, axis, x0: rightEdge, x1: rightEdge + d.width };
+      rightEdge += d.width + gap;
+      return strip;
+    }
+    const strip = { ...d, axis, x0: leftEdge - d.width, x1: leftEdge };
+    leftEdge -= d.width + gap;
+    return strip;
+  });
+}
+function seriesAxisFormat(chart, seriesIndex) {
+  const ax = chart.yAxes?.[chart.series[seriesIndex]?.axisIndex ?? 0];
+  return ax?.format ?? chart.config.formatY ?? String;
+}
+
 // src/chart-library.ts
 class Chart {
   id;
@@ -73,7 +101,6 @@ class Chart {
   setData(series, opts) {
     this._mgr.updateSeries(this.id, series, opts);
   }
-  // Follow-mode path: writes columns [offset, count) into the existing GPU buffers, see ChartManager.patchSeries.
   patchData(patch) {
     this._mgr.patchSeries(this.id, patch);
   }
@@ -155,7 +182,7 @@ class Chart {
     this._mgr.destroy(this.id);
   }
 }
-var GPU_GAP = -3e38;
+var GPU_GAP = -300000000000000000000000000000000000000;
 function isNumericArray(v) {
   return Array.isArray(v) || ArrayBuffer.isView(v) && !(v instanceof DataView);
 }
@@ -165,8 +192,6 @@ function isSortedAscending(x) {
       return false;
   return true;
 }
-// A missing sample is null/NaN on the JS side and GPU_GAP on the GPU: NaN is not reliable in
-// WGSL, and Float32Array would silently turn null into 0.
 function toGpu(arr, scale = 1, offset = 0) {
   const n = arr.length;
   const out = new Float32Array(n);
@@ -182,7 +207,6 @@ function packInto(dst, dstOffset, src, srcOffset, k, scale = 1, offset = 0) {
     dst[dstOffset + i] = v == null || v !== v ? GPU_GAP : v * scale + offset;
   }
 }
-// The affine remap of a secondary-axis series into primary-axis space; a gap stays a gap.
 function mapPlot(arr, scale, offset) {
   const n = arr.length;
   const out = new Float64Array(n);
@@ -312,8 +336,8 @@ class _ChartManager {
     if (this.worker)
       return true;
     return new Promise((resolve) => {
-      Promise.resolve().then(() => exports_worker_inline).then(({ WORKER_CODE: WORKER_CODE2 }) => {
-        const blob = new Blob([WORKER_CODE2], {
+      Promise.resolve().then(() => ({})).then(({}) => {
+        const blob = new Blob([WORKER_CODE], {
           type: "application/javascript"
         });
         this.worker = new Worker(URL.createObjectURL(blob), {
@@ -532,9 +556,6 @@ class _ChartManager {
     chart.series = series.map((s) => {
       const n = s.x.length;
       const color = parseColor(s.color);
-      // An empty series keeps its extra arrays (empty): the renderer's bind groups need every
-      // buffer to exist, and follow mode later patches columns into the capacity-sized buffers.
-      // Time series arrive sorted: keep them by reference and only sort the ones that are not.
       const idx = isSortedAscending(s.x) ? null : Array.from({ length: n }, (_, i) => i).sort((a, b) => s.x[a] - s.x[b]);
       const pick = (arr) => idx ? idx.map((i) => arr[i]) : arr;
       const extra = {};
@@ -556,10 +577,6 @@ class _ChartManager {
       chart.config.defaultBounds = { ...opts.bounds };
     this.refreshSeriesData(chart, opts.capacity);
   }
-  // Re-derive axes, bounds and GPU-space data from chart.series and push it to
-  // the worker. Also called after axis-affecting config changes (yAxes, gap,
-  // defaultBounds), so those take effect without re-supplying the data; the GPU
-  // buffers keep the capacity they have then.
   refreshSeriesData(chart, capacity) {
     if (!this.worker || chart.series.length === 0)
       return;
@@ -573,35 +590,35 @@ class _ChartManager {
         s.plotY = s.rawY;
       }
       ({ minX, maxX, minY, maxY } = customBounds ?? (() => {
-        let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (const s of chart.series) {
           for (let i = 0;i < s.rawX.length; i++) {
             const x = s.rawX[i], y = s.rawY[i];
-            if (x < minX2)
-              minX2 = x;
-            if (x > maxX2)
-              maxX2 = x;
-            if (y != null && y < minY2)
-              minY2 = y;
-            if (y != null && y > maxY2)
-              maxY2 = y;
+            if (x < minX)
+              minX = x;
+            if (x > maxX)
+              maxX = x;
+            if (y != null && y < minY)
+              minY = y;
+            if (y != null && y > maxY)
+              maxY = y;
           }
         }
-        if (!isFinite(minX2)) {
-          minX2 = 0;
-          maxX2 = 1;
+        if (!isFinite(minX)) {
+          minX = 0;
+          maxX = 1;
         }
-        if (!isFinite(minY2)) {
-          minY2 = 0;
-          maxY2 = 1;
+        if (!isFinite(minY)) {
+          minY = 0;
+          maxY = 1;
         }
-        const px = (maxX2 - minX2) * 0.05 || 1;
-        const py = (maxY2 - minY2) * 0.1 || 1;
+        const px = (maxX - minX) * 0.05 || 1;
+        const py = (maxY - minY) * 0.1 || 1;
         return {
-          minX: minX2 - px,
-          maxX: maxX2 + px,
-          minY: minY2 - py,
-          maxY: maxY2 + py
+          minX: minX - px,
+          maxX: maxX + px,
+          minY: minY - py,
+          maxY: maxY + py
         };
       })());
       const db = chart.config.defaultBounds;
@@ -616,7 +633,6 @@ class _ChartManager {
           maxY = db.maxY;
       }
     } else {
-      // X bounds: renderer-specific if available, else data extent + 5% pad.
       if (customBounds) {
         minX = customBounds.minX;
         maxX = customBounds.maxX;
@@ -641,8 +657,6 @@ class _ChartManager {
       const byId = new Map(axes.map((a, i) => [a.id, i]));
       for (const s of chart.series)
         s.axisIndex = s.yAxis != null && byId.has(String(s.yAxis)) ? byId.get(String(s.yAxis)) : 0;
-      // Per-axis Y bounds from that axis' series (incl. y-positional channels),
-      // 10% pad; manual min/max win.
       for (let ai = 0;ai < axes.length; ai++) {
         const ax = axes[ai];
         let lo = Infinity, hi = -Infinity;
@@ -686,8 +700,6 @@ class _ChartManager {
         if (db.maxY !== undefined)
           axes[0].max = db.maxY;
       }
-      // The first axis defines the internal plot space; every other axis is an
-      // affine remap into it (plotY = y * scale + offset).
       const prim = axes[0];
       const primRange = prim.max - prim.min || 1;
       for (const ax of axes) {
@@ -703,8 +715,6 @@ class _ChartManager {
       }
     }
     chart.bounds = { minX, maxX, minY, maxY };
-    // GPU buffers are sized to the capacity so patchSeries can append without recreating them;
-    // a refresh after a config change keeps the capacity the buffers already have.
     let longest = 0;
     for (const s of chart.series)
       if (s.rawX.length > longest)
@@ -712,7 +722,6 @@ class _ChartManager {
     chart.capacity = Math.max(capacity ?? chart.capacity ?? 0, longest);
     const { bufferSizes, perSeriesPassMeta } = this.computeRendererMeta(chart.renderer, chart);
     const hidden = chart.config.hiddenSeries ?? new Set;
-    // Series sharing one x array by reference (a sampled trend) upload it once, bound to every series.
     const sharedX = chart.series.every((s) => s.rawX === chart.series[0].rawX) ? chart.series[0].rawX : null;
     const sharedXData = sharedX ? toGpu(sharedX) : null;
     const seriesData = chart.series.map((s, i) => {
@@ -720,8 +729,6 @@ class _ChartManager {
       const mapped = !!ax && (ax.scale !== 1 || ax.offset !== 0);
       const extra = {};
       for (const key in s.extra) {
-        // Y-positional channels of a series on a secondary axis are remapped like its y; a
-        // bar height scales without the offset. Gaps stay gaps through the mapping.
         const scale = mapped && (Y_PLOT_CHANNELS.has(key) || key === "h") ? ax.scale : 1;
         const offset = mapped && Y_PLOT_CHANNELS.has(key) ? ax.offset : 0;
         extra[key] = toGpu(s.extra[key], scale, offset);
@@ -757,11 +764,6 @@ class _ChartManager {
     this.sendViewTransform(chart);
     this.drawChart(chart);
   }
-  // Writes columns [offset, count) of every series into the GPU buffers updateSeries created
-  // (up to `capacity` columns per series) without recreating anything - follow mode's per-tick
-  // path. `series` carries each series' full arrays of length `count` (y plus the renderer's
-  // extra arrays such as lo/hi), which also become what the hover layer reads; `x` is the shared
-  // x array. All values of one tick travel in one packed transferable.
   patchSeries(id, patch) {
     const chart = this.charts.get(id);
     if (!chart || !this.worker || chart.series.length === 0)
@@ -780,8 +782,6 @@ class _ChartManager {
       for (const key of extraKeys)
         if (p[key])
           s.extra[key] = p[key];
-      // A series on a secondary axis is drawn in primary-axis space with the mapping of the last
-      // full update (see refreshSeriesData); the hover reads the same mapping.
       const ax = axes?.[s.axisIndex];
       s.plotY = ax && (ax.scale !== 1 || ax.offset !== 0) ? mapPlot(p.y, ax.scale, ax.offset) : p.y;
     }
@@ -807,7 +807,8 @@ class _ChartManager {
       }
       transferables.push(packed.buffer);
       if (x) {
-        xData = toGpu(x.subarray ? x.subarray(offset, count) : x.slice(offset, count));
+        const xa = x;
+        xData = toGpu(xa.subarray ? xa.subarray(offset, count) : xa.slice(offset, count));
         transferables.push(xData.buffer);
       }
     }
@@ -825,7 +826,6 @@ class _ChartManager {
     this.sendViewTransform(chart);
     this.drawChart(chart);
   }
-  // Moves the data window without touching the data: follow mode's tick when nothing new arrived.
   setBounds(id, bounds) {
     const chart = this.charts.get(id);
     if (!chart || !this.worker)
@@ -836,7 +836,6 @@ class _ChartManager {
     this.sendViewTransform(chart);
     this.drawChart(chart);
   }
-  // sync: false, or the axes linked charts share - "x", "y" or "both" (true means "both").
   setSyncViews(sync) {
     this._syncViews = sync === true ? "both" : sync || false;
   }
@@ -909,8 +908,6 @@ class _ChartManager {
       zoomY: chart.view.zoomY
     });
   }
-  // Linked charts share the axes setSyncViews named. Charts of one quantity want both; a trend
-  // page, whose plots share the window but each have their own scale, links "x" alone.
   syncAllViews(source) {
     const mode = this._syncViews;
     const x = mode === "x" || mode === "both";
@@ -959,96 +956,12 @@ class _ChartManager {
   }
 }
 var ChartManager = _ChartManager.getInstance();
-// src/plugins/shared.ts
-var MARGIN = { left: 55, right: 10, top: 8, bottom: 45 };
-
-// ─── Multi Y-axis support ────────────────────────────────────────────────────
-var DEFAULT_AXIS_WIDTH = 55;
-var DEFAULT_AXIS_GAP = 6;
-// Extra channels holding Y positions that must be remapped into primary-axis
-// space for series bound to a secondary axis.
-var Y_PLOT_CHANNELS = new Set(["open", "high", "low", "lo", "hi"]);
-
-// Resolve config.yAxes into normalized descriptors, or null when the chart
-// uses the implicit single default axis. Defaults: first axis left, others right.
-function yAxisDefs(chart) {
-  const defs = chart.config.yAxes;
-  if (!Array.isArray(defs) || defs.length === 0)
-    return null;
-  return defs.map((d, i) => ({
-    id: d.id ?? String(i),
-    side: d.side === "right" ? "right" : d.side === "left" ? "left" : i === 0 ? "left" : "right",
-    width: d.width ?? DEFAULT_AXIS_WIDTH,
-    format: typeof d.format === "function" ? d.format : undefined,
-    color: d.color,
-    min: d.min,
-    max: d.max
-  }));
-}
-
-function hasRightAxes(chart) {
-  const defs = yAxisDefs(chart);
-  return !!defs && defs.some((d) => d.side === "right");
-}
-
-// Chart margins including the strip claimed by every configured y-axis.
-// Falls back to the classic MARGIN for implicit single-axis charts.
-function chartMargin(chart) {
-  const defs = yAxisDefs(chart);
-  if (!defs)
-    return MARGIN;
-  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
-  let left = 0, right = 0, nl = 0, nr = 0;
-  for (const d of defs) {
-    if (d.side === "right")
-      right += (nr++ > 0 ? gap : 0) + d.width;
-    else
-      left += (nl++ > 0 ? gap : 0) + d.width;
-  }
-  return {
-    left: nl > 0 ? left : MARGIN.right,
-    right: nr > 0 ? right : MARGIN.right,
-    top: MARGIN.top,
-    bottom: MARGIN.bottom
-  };
-}
-
-// Horizontal strip [x0, x1] occupied by each y-axis: the first axis of a side
-// sits next to the plot, later ones stack outward separated by yAxisGap.
-function yAxisStrips(chart, m, w) {
-  const defs = yAxisDefs(chart);
-  if (!defs)
-    return null;
-  const gap = chart.config.yAxisGap ?? DEFAULT_AXIS_GAP;
-  let leftEdge = m.left, rightEdge = w - m.right;
-  return defs.map((d, i) => {
-    const axis = chart.yAxes?.[i];
-    if (d.side === "right") {
-      const strip = { ...d, axis, x0: rightEdge, x1: rightEdge + d.width };
-      rightEdge += d.width + gap;
-      return strip;
-    }
-    const strip = { ...d, axis, x0: leftEdge - d.width, x1: leftEdge };
-    leftEdge -= d.width + gap;
-    return strip;
-  });
-}
-
-// Formatter for the axis a given series is bound to (falls back to formatY).
-function seriesAxisFormat(chart, seriesIndex) {
-  const ax = chart.yAxes?.[chart.series[seriesIndex]?.axisIndex ?? 0];
-  return ax?.format ?? chart.config.formatY ?? String;
-}
-
 // src/plugins/labels.ts
 var DEFAULT_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 var DEFAULT_LABEL_SIZE = 12;
 function computeHomeView(chart) {
   const { width, height } = chart;
   const m = chartMargin(chart);
-  // Preserve the classic insets (l 32 / r 8 for MARGIN 55/10) while growing
-  // with the strips claimed by additional y-axes. Without the margin fade the
-  // strips have a hard edge, so the data starts right at it instead of under it.
   const l = chart.config.bgFade === false ? m.left : Math.max(8, m.left - 23), t = 8, r = Math.max(8, m.right - 2), b = 48;
   const innerW = width - l - r;
   const innerH = height - t - b;
@@ -1141,9 +1054,6 @@ var labelsPlugin = {
       ctx.fillStyle = g;
       ctx.fillRect(x, y, fw, fh);
     };
-    // The axis margins are painted in the background colour so the labels stay readable over
-    // data running under them: as a gradient reaching 20px into the plot, which fades the data
-    // out toward the borders (the default), or with bgFade off as plain strips with a hard edge.
     if (chart.config.bgFade === false) {
       ctx.fillStyle = `rgb(${bg})`;
       ctx.fillRect(0, 0, m.left, h);
@@ -1172,7 +1082,6 @@ var labelsPlugin = {
         const scale = strip.axis?.scale ?? 1;
         const offset = strip.axis?.offset ?? 0;
         const fmt = strip.format ?? formatY;
-        // Visible primary-space window my..my+ry mapped into this axis' units.
         const aMin = (my - offset) / scale;
         const aMax = (my + ry - offset) / scale;
         ctx.fillStyle = strip.color ?? text;
@@ -1200,7 +1109,6 @@ var labelsPlugin = {
     });
   }
 };
-
 // src/plugins/coords.ts
 function dataToScreen(dataX, dataY, chart, width, height) {
   const rX = chart.bounds.maxX - chart.bounds.minX;
@@ -1243,23 +1151,23 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
   for (let s = 0;s < chart.series.length; s++) {
     if (chart.config?.hiddenSeries?.has(s))
       continue;
-    const sr2 = chart.series[s];
-    const n = sr2.rawX.length;
+    const sr = chart.series[s];
+    const n = sr.rawX.length;
     if (n === 0)
       continue;
     let lo = 0, hi = n - 1;
     while (lo < hi) {
       const mid = lo + hi >> 1;
-      if (sr2.rawX[mid] < dataX)
+      if (sr.rawX[mid] < dataX)
         lo = mid + 1;
       else
         hi = mid;
     }
     let idx = lo;
-    if (lo > 0 && Math.abs(sr2.rawX[lo - 1] - dataX) < Math.abs(sr2.rawX[lo] - dataX))
+    if (lo > 0 && Math.abs(sr.rawX[lo - 1] - dataX) < Math.abs(sr.rawX[lo] - dataX))
       idx = lo - 1;
-    const dx = Math.abs(sr2.rawX[idx] - dataX);
-    const dy = Math.abs((sr2.plotY ?? sr2.rawY)[idx] - dataY);
+    const dx = Math.abs(sr.rawX[idx] - dataX);
+    const dy = Math.abs((sr.plotY ?? sr.rawY)[idx] - dataY);
     if (dx < bdx || dx === bdx && dy < bdy) {
       bdx = dx;
       bdy = dy;
@@ -1283,10 +1191,6 @@ function findNearestPoint(chart, screenX, screenY, width, height) {
     seriesLabel: sr.label
   };
 }
-// Series sharing one x array (the sampled trend): the line under the cursor is the one whose
-// segment between the two neighbouring columns passes closest, so the pick follows a line along
-// its whole length instead of jumping at vertex midpoints. Returns undefined when the series do
-// not share x, null when nothing is within reach.
 function findNearestLine(chart, dataX, dataY, height) {
   const first = chart.series[0];
   const xs = first.rawX;
@@ -1349,23 +1253,12 @@ function findNearestLine(chart, dataX, dataY, height) {
     seriesLabel: sr.label
   };
 }
-// Text colour on a fill of a series colour: the same hue pulled toward black on a light fill or
-// toward white on a dark one, by `k`, so it stays readable for any of the palette's colours.
 var onColor = (rgb, k) => {
   const [r, g, b] = rgb.split(",").map(Number);
   const t = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.4 ? 0 : 255;
   return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`;
 };
 var states = new WeakMap;
-var drawBox = (ctx, x, y, w, h, r, fill, stroke) => {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-};
 var hoverPlugin = {
   name: "hover",
   install(chart, el) {
@@ -1385,11 +1278,10 @@ var hoverPlugin = {
     const update = (res) => {
       if (chart.config.onHover)
         chart.config.onHover(res);
-      // The GPU draws the hovered series on top and dims the rest; only a change is posted.
       const hl = res && chart.config.highlightHover !== false ? res.seriesIndex : -1;
       if (hl !== s.highlight) {
         s.highlight = hl;
-        mgr.worker?.postMessage({ type: M.SET_STYLE, id: el.dataset.chartId, highlightSeries: hl });
+        mgr["worker"]?.postMessage({ type: M.SET_STYLE, id: el.dataset.chartId, highlightSeries: hl });
       }
       if (!(chart.config.showTooltip ?? false))
         return;
@@ -1474,14 +1366,14 @@ var hoverPlugin = {
           const v = ser.rawY[m];
           if (v == null || v !== v)
             return null;
-          const rgb2 = `${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)}`;
+          const rgb = `${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)}`;
           return {
             si,
             label: ser.label,
             val: seriesAxisFormat(chart, si)(v),
             rawVal: v,
-            rgb: rgb2,
-            col: `rgb(${rgb2})`
+            rgb,
+            col: `rgb(${rgb})`
           };
         }
         ser.rawX[m] < hvr.x ? l = m + 1 : r = m - 1;
@@ -1489,7 +1381,6 @@ var hoverPlugin = {
       return null;
     }).filter((x) => x !== null);
     seriesData.sort((a, b) => Math.abs(b.rawVal) - Math.abs(a.rawVal));
-    // The hovered series leads the list, whatever its magnitude.
     const hovered = seriesData.findIndex((d) => d.si === hvr.seriesIndex);
     if (hovered > 0)
       seriesData.unshift(...seriesData.splice(hovered, 1));
@@ -1510,9 +1401,9 @@ var hoverPlugin = {
       const angle = isX ? Math.atan((s.pillTargetX - s.pillX) / 80) * 0.2 : Math.atan((s.pillTargetY - s.pillY) / 80) * 0.2;
       ctx.translate(x, y);
       ctx.rotate(angle);
-      const bx2 = isX ? -pw / 2 : anchorLeft ? 0 : -pw, by2 = isX ? 0 : -ph / 2;
+      const bx = isX ? -pw / 2 : anchorLeft ? 0 : -pw, by = isX ? 0 : -ph / 2;
       ctx.beginPath();
-      ctx.roundRect(bx2, by2, pw, ph, 4);
+      ctx.roundRect(bx, by, pw, ph, 4);
       ctx.fillStyle = dark ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.75)";
       ctx.fill();
       ctx.fillStyle = `rgba(${rgb},0.2)`;
@@ -1523,12 +1414,11 @@ var hoverPlugin = {
       ctx.fillStyle = textCol;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(txt, bx2 + pw / 2, by2 + ph / 2);
+      ctx.fillText(txt, bx + pw / 2, by + ph / 2);
       ctx.restore();
     };
     drawPill(Math.max(margin.left, Math.min(w - margin.right, s.pillX)), h - margin.bottom + 4, formatX(hvr.x), true);
     if (hasY) {
-      // The y pill sits on the axis the hovered series is bound to and uses that axis' format.
       const hoveredAxis = chart.yAxes?.[chart.series[hvr.seriesIndex]?.axisIndex ?? 0];
       const pillLabel = seriesAxisFormat(chart, hvr.seriesIndex)(hvr.value ?? hvr.y);
       const pillY = Math.max(9, Math.min(h - margin.bottom - 9, s.pillY));
@@ -1537,9 +1427,6 @@ var hoverPlugin = {
       else
         drawPill(margin.left, pillY, pillLabel, false);
     }
-    // The hovered series (the highlighted line) is the tooltip's header: a block filled with
-    // its colour carrying its name, the time and the value large, so it reads as "this one"
-    // without knowing the ordering rule. The other series follow as a quiet list.
     const rowFont = `600 10px ${fontFamily}`, nameFont = `600 11px ${fontFamily}`, valueFont = `600 18px ${fontFamily}`;
     const rowH = 18, pad = 10;
     const leadIsHovered = displayData.length > 0 && displayData[0].si === hvr.seriesIndex;
@@ -1961,9 +1848,6 @@ function computePanelWidth(chart, labels) {
   const target = Math.ceil(maxW) + swatchGap + padding;
   return Math.min(Math.max(target, PANEL_MIN_WIDTH), PANEL_MAX_WIDTH);
 }
-// Runs on every draw, so it has to stay cheap with thousands of series: the rows are rebuilt
-// only when the labels change and only while the panel is open (a closed panel rebuilds when it
-// opens), and the hidden styling is reapplied only when the hidden set changed.
 function syncSeries(chart) {
   const s = states2.get(chart);
   if (!s)
@@ -2112,645 +1996,307 @@ injectLegendKeyframes();
 // src/plugins/zoom.ts
 var MIN_ZOOM = 0.1;
 var MAX_ZOOM = 1e7;
-
 function zoomPlugin(opts = {}) {
-    const state = new WeakMap;
-    return {
-        name: "zoom",
-        install(chart, el) {
-            const originalTouchAction = el.style.touchAction;
-            const originalUserSelect = el.style.userSelect;
-            const originalWebkitUserSelect = el.style.webkitUserSelect;
-            el.style.touchAction = "none";
-            el.style.userSelect = "none";
-            el.style.webkitUserSelect = "none";
-            const mgr = ChartManager;
-            const ac = new AbortController;
-            const s = {
-                lastX: 0,
-                lastY: 0,
-                velX: 0,
-                velY: 0,
-                abort: ac,
-                originalTouchAction,
-                originalUserSelect,
-                originalWebkitUserSelect,
-                el
-            };
-            const mode = () => chart.config.zoomMode ?? "both";
-            state.set(chart, s);
-            let pointers = [];
-            let gestureState = "none";
-            let startX = 0, startY = 0, lastX = 0, lastY = 0, lastTime = 0;
-            const PAN_THRESHOLD = 10;
-            const TAP_THRESHOLD = 10;
-            const PRESS_TIME = 500;
-            let pressTimer = null;
-            let pinchStartDist = 0, pinchStartZoomX = 1, pinchStartZoomY = 1;
-            let pinchCenterX = 0.5, pinchCenterY = 0.5;
-            let velX = 0, velY = 0;
-            let lastTapTime = 0;
-            // The axis a drag has grabbed ("x" below the plot, "y" left of it), or null.
-            let axisMode = null;
-
-            const axisAt = (e) => {
-                const rect = el.getBoundingClientRect();
-                const localX = e.clientX - rect.left, localY = e.clientY - rect.top;
-                const margin = chartMargin(chart);
-                const overY = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
-                const overX = localY > rect.height - margin.bottom;
-                if (overY && !overX) return "y";
-                if (overX && !overY) return "x";
-                return null;
-            };
-            // The cursor says what a drag would do: slide the axis under it, or pan the plot.
-            const hoverCursor = (e) => {
-                const a = axisAt(e);
-                return a === "x" ? "ew-resize" : a === "y" ? "ns-resize" : "";
-            };
-
-            const sendView = () => {
-                mgr.requestRender(chart.id);
-                mgr.drawChart(chart);
-                if (mgr.syncViews)
-                    mgr.syncAllViews(chart);
-            };
-
-            el.addEventListener("pointerdown", (e) => {
-                pointers.push(e);
-                el.setPointerCapture(e.pointerId);
-
-                // Ensure dragging is true as long as there is an active pointer down
-                chart.dragging = true;
-
-                if (pointers.length === 1) {
-                    gestureState = "detecting";
-                    startX = e.clientX;
-                    startY = e.clientY;
-                    lastX = e.clientX;
-                    lastY = e.clientY;
-                    velX = velY = 0;
-                    lastTime = performance.now();
-                    // A press on an axis gutter grabs that axis: the drag then pans it
-                    // alone, whatever the zoom mode says about the plot area.
-                    axisMode = axisAt(e);
-                    if (axisMode) {
-                        el.style.cursor = axisMode === "x" ? "ew-resize" : "ns-resize";
-                    } else if (e.pointerType === "touch") {
-                        pressTimer = window.setTimeout(() => {
-                            if (gestureState === "detecting") {
-                                gestureState = "press";
-                            }
-                        }, PRESS_TIME);
-                    } else {
-                        el.style.cursor = "grabbing";
-                    }
-                } else if (pointers.length === 2) {
-                    if (pressTimer) {
-                        clearTimeout(pressTimer);
-                        pressTimer = null;
-                    }
-                    gestureState = "pinch";
-                    if (e.pointerType === "touch") {
-                        e.preventDefault();
-                    }
-                    const rect = el.getBoundingClientRect();
-                    const dx = pointers[1].clientX - pointers[0].clientX;
-                    const dy = pointers[1].clientY - pointers[0].clientY;
-                    pinchStartDist = Math.hypot(dx, dy);
-                    pinchStartZoomX = chart.view.zoomX;
-                    pinchStartZoomY = chart.view.zoomY;
-                    pinchCenterX = ((pointers[0].clientX + pointers[1].clientX) / 2 - rect.left) / rect.width;
-                    pinchCenterY = 1 - ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) / rect.height;
-                }
-            }, { passive: false, signal: ac.signal });
-
-            el.addEventListener("pointermove", (e) => {
-                const idx = pointers.findIndex((p) => p.pointerId === e.pointerId);
-                if (idx >= 0) {
-                    pointers[idx] = e;
-                }
-                if (pointers.length >= 1 && e.buttons === 0 && (gestureState === "pan" || gestureState === "detecting" || gestureState === "press" || axisMode !== null)) {
-                    endPointer(e);
-                    return;
-                }
-                if (pointers.length === 0) {
-                    if (e.pointerType !== "touch") el.style.cursor = hoverCursor(e);
-                    return;
-                }
-                if (pointers.length === 1) {
-                    const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
-                    if (gestureState === "detecting" && totalDist > PAN_THRESHOLD) {
-                        gestureState = "pan";
-                        if (pressTimer) {
-                            clearTimeout(pressTimer);
-                            pressTimer = null;
-                        }
-                    }
-                    if (gestureState === "press") {
-                        return;
-                    }
-                    if (axisMode) {
-                        // Pan the grabbed axis one-to-one, so the value under the pointer
-                        // stays under the pointer: the same feel as dragging the plot,
-                        // restricted to one axis. Zooming an axis is the wheel over it,
-                        // anchored at the pointer like the wheel over the plot. It used to
-                        // stretch the axis about the centre of the view at an exponential
-                        // rate instead, so the tick under the hand slid away, and in
-                        // x-only mode the y range could not be shifted at all.
-                        const rect = el.getBoundingClientRect();
-                        if (axisMode === "x") {
-                            chart.view.panX -= (e.clientX - lastX) / rect.width / chart.view.zoomX;
-                        } else {
-                            chart.view.panY += (e.clientY - lastY) / rect.height / chart.view.zoomY;
-                        }
-                        lastX = e.clientX;
-                        lastY = e.clientY;
-                        sendView();
-                        return;
-                    }
-                    if (gestureState === "pan" || chart.dragging) {
-                        const rect = el.getBoundingClientRect();
-                        const dx = (e.clientX - lastX) / rect.width;
-                        const dy = (e.clientY - lastY) / rect.height;
-                        const now = performance.now();
-                        if (now - lastTime < 100) {
-                            velX = velX * 0.3 + dx * 0.7;
-                            velY = velY * 0.3 + dy * 0.7;
-                        }
-                        lastTime = now;
-                        const m = mode();
-                        if (m !== "none" && (m === "both" || m === "x-only"))
-                            chart.view.panX -= dx / chart.view.zoomX;
-                        if (m !== "none" && (m === "both" || m === "y-only"))
-                            chart.view.panY += dy / chart.view.zoomY;
-                        lastX = e.clientX;
-                        lastY = e.clientY;
-                        sendView();
-                    }
-                } else if (pointers.length === 2 && gestureState === "pinch") {
-                    if (e.pointerType === "touch") {
-                        e.preventDefault();
-                    }
-                    const rect = el.getBoundingClientRect();
-                    const dx = pointers[1].clientX - pointers[0].clientX;
-                    const dy = pointers[1].clientY - pointers[0].clientY;
-                    const dist = Math.hypot(dx, dy);
-                    const currentPinchCenterX = ((pointers[0].clientX + pointers[1].clientX) / 2 - rect.left) / rect.width;
-                    const currentPinchCenterY = 1 - ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) / rect.height;
-                    const pixelChange = dist - pinchStartDist;
-                    const scale = Math.exp(pixelChange / 280);
-                    const pm = mode();
-                    if (pm !== "none" && (pm === "both" || pm === "x-only")) {
-                        const newZoomX = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchStartZoomX * scale));
-                        const fx = chart.view.panX + currentPinchCenterX / chart.view.zoomX;
-                        chart.view.zoomX = newZoomX;
-                        chart.view.panX = fx - currentPinchCenterX / newZoomX;
-                    }
-                    if (pm !== "none" && (pm === "both" || pm === "y-only")) {
-                        const newZoomY = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchStartZoomY * scale));
-                        const fy = chart.view.panY + currentPinchCenterY / chart.view.zoomY;
-                        chart.view.zoomY = newZoomY;
-                        chart.view.panY = fy - currentPinchCenterY / newZoomY;
-                    }
-                    sendView();
-                }
-            }, { passive: false, signal: ac.signal });
-
-            const endPointer = (e) => {
-                pointers = pointers.filter((p) => p.pointerId !== e.pointerId);
-                try { el.releasePointerCapture(e.pointerId); } catch (err) { }
-
-                if (pressTimer) {
-                    clearTimeout(pressTimer);
-                    pressTimer = null;
-                }
-
-                if (pointers.length === 0) {
-                    const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
-                    const isTap = totalDist < TAP_THRESHOLD && gestureState !== "pan";
-
-                    // NEW: If it was NOT a tap, stamp the exact time the drag ended.
-                    if (!isTap) {
-                        chart.lastDragEndTime = Date.now();
-                    }
-
-                    if (isTap) {
-                        const now = Date.now();
-                        if (now - lastTapTime < 300) {
-                            mgr.resetView(chart.id);
-                            lastTapTime = 0;
-                        } else {
-                            lastTapTime = now;
-                        }
-                    }
-                    gestureState = "none";
-                    chart.dragging = false;
-                    axisMode = null;
-                    el.style.cursor = e.pointerType === "touch" ? "" : hoverCursor(e);
-                } else if (pointers.length === 1) {
-                    gestureState = "detecting";
-                    startX = pointers[0].clientX;
-                    startY = pointers[0].clientY;
-                    lastX = pointers[0].clientX;
-                    lastY = pointers[0].clientY;
-                    chart.dragging = true;
-                }
-            };
-            el.addEventListener("pointerup", endPointer, { signal: ac.signal });
-            el.addEventListener("pointercancel", endPointer, { signal: ac.signal });
-            el.addEventListener("pointerleave", () => {
-                if (pointers.length === 0) el.style.cursor = "";
-            }, { signal: ac.signal });
-
-            let wheelTimeout = null;
-
-            el.addEventListener("wheel", (e) => {
-                e.preventDefault();
-                const rect = el.getBoundingClientRect();
-                const localX = e.clientX - rect.left;
-                const localY = e.clientY - rect.top;
-                const mx = localX / rect.width;
-                const my = 1 - localY / rect.height;
-                const scale = 1 - e.deltaY * 0.002;
-                const margin = chartMargin(chart);
-                const overYAxis = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
-                const overXAxis = localY > rect.height - margin.bottom;
-                let zoomX;
-                let zoomY;
-                if (overYAxis) {
-                    zoomX = false;
-                    zoomY = true;
-                } else if (overXAxis) {
-                    zoomX = true;
-                    zoomY = false;
-                } else {
-                    const wm = mode();
-                    zoomX = wm === "both" || wm === "x-only";
-                    zoomY = wm === "both" || wm === "y-only";
-                }
-                if (zoomX) {
-                    const fx = chart.view.panX + mx / chart.view.zoomX;
-                    chart.view.zoomX = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, chart.view.zoomX * scale));
-                    chart.view.panX = fx - mx / chart.view.zoomX;
-                }
-                if (zoomY) {
-                    const fy = chart.view.panY + my / chart.view.zoomY;
-                    chart.view.zoomY = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, chart.view.zoomY * scale));
-                    chart.view.panY = fy - my / chart.view.zoomY;
-                }
-                chart.dragging = true;
-                if (wheelTimeout) clearTimeout(wheelTimeout);
-                wheelTimeout = setTimeout(() => {
-                    chart.dragging = false;
-                }, 150);
-
-                if (zoomX || zoomY)
-                    sendView();
-            }, { passive: false, signal: ac.signal });
-        },
-        resetView(chart) {
-
-        },
-        uninstall(chart) {
-            const s = state.get(chart);
-            if (s) {
-                s.el.style.touchAction = s.originalTouchAction;
-                s.el.style.userSelect = s.originalUserSelect;
-                s.el.style.webkitUserSelect = s.originalWebkitUserSelect;
-                s.abort.abort();
-                state.delete(chart);
-            }
+  const state = new WeakMap;
+  return {
+    name: "zoom",
+    install(chart, el) {
+      const originalTouchAction = el.style.touchAction;
+      const originalUserSelect = el.style.userSelect;
+      const originalWebkitUserSelect = el.style.webkitUserSelect;
+      el.style.touchAction = "none";
+      el.style.userSelect = "none";
+      el.style.webkitUserSelect = "none";
+      const mgr = ChartManager;
+      const ac = new AbortController;
+      const s = {
+        lastX: 0,
+        lastY: 0,
+        velX: 0,
+        velY: 0,
+        abort: ac,
+        originalTouchAction,
+        originalUserSelect,
+        originalWebkitUserSelect,
+        el
+      };
+      const mode = () => chart.config.zoomMode ?? "both";
+      state.set(chart, s);
+      let pointers = [];
+      let gestureState = "none";
+      let startX = 0, startY = 0, lastX = 0, lastY = 0, lastTime = 0;
+      const PAN_THRESHOLD = 10;
+      const TAP_THRESHOLD = 10;
+      const PRESS_TIME = 500;
+      let pressTimer = null;
+      let pinchStartDist = 0, pinchStartZoomX = 1, pinchStartZoomY = 1;
+      let pinchCenterX = 0.5, pinchCenterY = 0.5;
+      let velX = 0, velY = 0;
+      let lastTapTime = 0;
+      let axisMode = null;
+      const axisAt = (e) => {
+        const rect = el.getBoundingClientRect();
+        const localX = e.clientX - rect.left, localY = e.clientY - rect.top;
+        const margin = chartMargin(chart);
+        const overY = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
+        const overX = localY > rect.height - margin.bottom;
+        if (overY && !overX)
+          return "y";
+        if (overX && !overY)
+          return "x";
+        return null;
+      };
+      const hoverCursor = (e) => {
+        const a = axisAt(e);
+        return a === "x" ? "ew-resize" : a === "y" ? "ns-resize" : "";
+      };
+      const sendView = () => {
+        mgr.requestRender(chart.id);
+        mgr.drawChart(chart);
+        if (mgr.syncViews)
+          mgr.syncAllViews(chart);
+      };
+      el.addEventListener("pointerdown", (e) => {
+        pointers.push(e);
+        el.setPointerCapture(e.pointerId);
+        chart.dragging = true;
+        if (pointers.length === 1) {
+          gestureState = "detecting";
+          startX = e.clientX;
+          startY = e.clientY;
+          lastX = e.clientX;
+          lastY = e.clientY;
+          velX = velY = 0;
+          lastTime = performance.now();
+          axisMode = axisAt(e);
+          if (axisMode) {
+            el.style.cursor = axisMode === "x" ? "ew-resize" : "ns-resize";
+          } else if (e.pointerType === "touch") {
+            pressTimer = window.setTimeout(() => {
+              if (gestureState === "detecting") {
+                gestureState = "press";
+              }
+            }, PRESS_TIME);
+          } else {
+            el.style.cursor = "grabbing";
+          }
+        } else if (pointers.length === 2) {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+          gestureState = "pinch";
+          if (e.pointerType === "touch") {
+            e.preventDefault();
+          }
+          const rect = el.getBoundingClientRect();
+          const dx = pointers[1].clientX - pointers[0].clientX;
+          const dy = pointers[1].clientY - pointers[0].clientY;
+          pinchStartDist = Math.hypot(dx, dy);
+          pinchStartZoomX = chart.view.zoomX;
+          pinchStartZoomY = chart.view.zoomY;
+          pinchCenterX = ((pointers[0].clientX + pointers[1].clientX) / 2 - rect.left) / rect.width;
+          pinchCenterY = 1 - ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) / rect.height;
         }
-    };
+      }, { passive: false, signal: ac.signal });
+      el.addEventListener("pointermove", (e) => {
+        const idx = pointers.findIndex((p) => p.pointerId === e.pointerId);
+        if (idx >= 0) {
+          pointers[idx] = e;
+        }
+        if (pointers.length >= 1 && e.buttons === 0 && (gestureState === "pan" || gestureState === "detecting" || gestureState === "press" || axisMode !== null)) {
+          endPointer(e);
+          return;
+        }
+        if (pointers.length === 0) {
+          if (e.pointerType !== "touch")
+            el.style.cursor = hoverCursor(e);
+          return;
+        }
+        if (pointers.length === 1) {
+          const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
+          if (gestureState === "detecting" && totalDist > PAN_THRESHOLD) {
+            gestureState = "pan";
+            if (pressTimer) {
+              clearTimeout(pressTimer);
+              pressTimer = null;
+            }
+          }
+          if (gestureState === "press") {
+            return;
+          }
+          if (axisMode) {
+            const rect = el.getBoundingClientRect();
+            if (axisMode === "x") {
+              chart.view.panX -= (e.clientX - lastX) / rect.width / chart.view.zoomX;
+            } else {
+              chart.view.panY += (e.clientY - lastY) / rect.height / chart.view.zoomY;
+            }
+            lastX = e.clientX;
+            lastY = e.clientY;
+            sendView();
+            return;
+          }
+          if (gestureState === "pan" || chart.dragging) {
+            const rect = el.getBoundingClientRect();
+            const dx = (e.clientX - lastX) / rect.width;
+            const dy = (e.clientY - lastY) / rect.height;
+            const now = performance.now();
+            if (now - lastTime < 100) {
+              velX = velX * 0.3 + dx * 0.7;
+              velY = velY * 0.3 + dy * 0.7;
+            }
+            lastTime = now;
+            const m = mode();
+            if (m !== "none" && (m === "both" || m === "x-only"))
+              chart.view.panX -= dx / chart.view.zoomX;
+            if (m !== "none" && (m === "both" || m === "y-only"))
+              chart.view.panY += dy / chart.view.zoomY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            sendView();
+          }
+        } else if (pointers.length === 2 && gestureState === "pinch") {
+          if (e.pointerType === "touch") {
+            e.preventDefault();
+          }
+          const rect = el.getBoundingClientRect();
+          const dx = pointers[1].clientX - pointers[0].clientX;
+          const dy = pointers[1].clientY - pointers[0].clientY;
+          const dist = Math.hypot(dx, dy);
+          const currentPinchCenterX = ((pointers[0].clientX + pointers[1].clientX) / 2 - rect.left) / rect.width;
+          const currentPinchCenterY = 1 - ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) / rect.height;
+          const pixelChange = dist - pinchStartDist;
+          const scale = Math.exp(pixelChange / 280);
+          const pm = mode();
+          if (pm !== "none" && (pm === "both" || pm === "x-only")) {
+            const newZoomX = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchStartZoomX * scale));
+            const fx = chart.view.panX + currentPinchCenterX / chart.view.zoomX;
+            chart.view.zoomX = newZoomX;
+            chart.view.panX = fx - currentPinchCenterX / newZoomX;
+          }
+          if (pm !== "none" && (pm === "both" || pm === "y-only")) {
+            const newZoomY = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchStartZoomY * scale));
+            const fy = chart.view.panY + currentPinchCenterY / chart.view.zoomY;
+            chart.view.zoomY = newZoomY;
+            chart.view.panY = fy - currentPinchCenterY / newZoomY;
+          }
+          sendView();
+        }
+      }, { passive: false, signal: ac.signal });
+      const endPointer = (e) => {
+        pointers = pointers.filter((p) => p.pointerId !== e.pointerId);
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        if (pointers.length === 0) {
+          const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
+          const isTap = totalDist < TAP_THRESHOLD && gestureState !== "pan";
+          if (!isTap) {
+            chart.lastDragEndTime = Date.now();
+          }
+          if (isTap) {
+            const now = Date.now();
+            if (now - lastTapTime < 300) {
+              mgr.resetView(chart.id);
+              lastTapTime = 0;
+            } else {
+              lastTapTime = now;
+            }
+          }
+          gestureState = "none";
+          chart.dragging = false;
+          axisMode = null;
+          el.style.cursor = e.pointerType === "touch" ? "" : hoverCursor(e);
+        } else if (pointers.length === 1) {
+          gestureState = "detecting";
+          startX = pointers[0].clientX;
+          startY = pointers[0].clientY;
+          lastX = pointers[0].clientX;
+          lastY = pointers[0].clientY;
+          chart.dragging = true;
+        }
+      };
+      el.addEventListener("pointerup", endPointer, { signal: ac.signal });
+      el.addEventListener("pointercancel", endPointer, { signal: ac.signal });
+      el.addEventListener("pointerleave", () => {
+        if (pointers.length === 0)
+          el.style.cursor = "";
+      }, { signal: ac.signal });
+      let wheelTimeout = null;
+      el.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const localY = e.clientY - rect.top;
+        const mx = localX / rect.width;
+        const my = 1 - localY / rect.height;
+        const scale = 1 - e.deltaY * 0.002;
+        const margin = chartMargin(chart);
+        const overYAxis = localX < margin.left || hasRightAxes(chart) && localX > rect.width - margin.right;
+        const overXAxis = localY > rect.height - margin.bottom;
+        let zoomX;
+        let zoomY;
+        if (overYAxis) {
+          zoomX = false;
+          zoomY = true;
+        } else if (overXAxis) {
+          zoomX = true;
+          zoomY = false;
+        } else {
+          const wm = mode();
+          zoomX = wm === "both" || wm === "x-only";
+          zoomY = wm === "both" || wm === "y-only";
+        }
+        if (zoomX) {
+          const fx = chart.view.panX + mx / chart.view.zoomX;
+          chart.view.zoomX = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, chart.view.zoomX * scale));
+          chart.view.panX = fx - mx / chart.view.zoomX;
+        }
+        if (zoomY) {
+          const fy = chart.view.panY + my / chart.view.zoomY;
+          chart.view.zoomY = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, chart.view.zoomY * scale));
+          chart.view.panY = fy - my / chart.view.zoomY;
+        }
+        chart.dragging = true;
+        if (wheelTimeout)
+          clearTimeout(wheelTimeout);
+        wheelTimeout = setTimeout(() => {
+          chart.dragging = false;
+        }, 150);
+        if (zoomX || zoomY)
+          sendView();
+      }, { passive: false, signal: ac.signal });
+    },
+    resetView(chart) {},
+    uninstall(chart) {
+      const s = state.get(chart);
+      if (s) {
+        s.el.style.touchAction = s.originalTouchAction;
+        s.el.style.userSelect = s.originalUserSelect;
+        s.el.style.webkitUserSelect = s.originalWebkitUserSelect;
+        s.abort.abort();
+        state.delete(chart);
+      }
+    }
+  };
 }
 // src/shaders/shared.ts
 var COMPUTE_WG = 256;
-var UNIFORM_STRUCT = `struct Uniforms {
-width: f32,
-height: f32,
-viewMinX: f32,
-viewMaxX: f32,
-viewMinY: f32,
-viewMaxY: f32,
-pointCount: u32,
-seriesCount: u32,
-isDark: u32,
-bgR: f32,
-bgG: f32,
-bgB: f32,
-dataMinX: f32,
-dataMaxX: f32,
-dataMinY: f32,
-dataMaxY: f32,
-highlight: u32,
-_hl0: u32,
-_hl1: u32,
-_hl2: u32,
-};
-struct SeriesInfo {
-color: vec4f,
-visibleRange: vec2u,
-_pad0: f32,
-_pad1: f32,
-};
-struct SeriesIndex {
-index: u32,
-_pad0: u32,
-_pad1: u32,
-_pad2: u32,
-};
-`;
-var BINARY_SEARCH = `fn lowerBound(val: f32, count: u32) -> u32 {
-var lo = 0u;
-var hi = count;
-while (lo < hi) {
-let mid = (lo + hi) / 2u;
-if (dataX[mid] < val) {
-lo = mid + 1u;
-} else {
-hi = mid;
-}
-}
-return lo;
-}
-`;
+var UNIFORM_STRUCT = `struct Uniforms{width: f32,height: f32,viewMinX: f32,viewMaxX: f32,viewMinY: f32,viewMaxY: f32,pointCount: u32,seriesCount: u32,isDark: u32,bgR: f32,bgG: f32,bgB: f32,dataMinX: f32,dataMaxX: f32,dataMinY: f32,dataMaxY: f32,highlight: u32,_hl0: u32,_hl1: u32,_hl2: u32,};struct SeriesInfo{color: vec4f,visibleRange: vec2u,_pad0: f32,_pad1: f32,};struct SeriesIndex{index: u32,_pad0: u32,_pad1: u32,_pad2: u32,};`;
+var BINARY_SEARCH = `fn lowerBound(val: f32,count: u32)-> u32{var lo = 0u;var hi = count;while(lo < hi){let mid =(lo + hi)/ 2u;if(dataX[mid] < val){lo = mid + 1u;}else{hi = mid;}}return lo;}`;
 
 // src/shaders/line.ts
-var LINE_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct LineUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
-struct LineData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var<storage, read_write> lineData: array<LineData>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> lu: LineUniforms;
-${BINARY_SEARCH}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-}
-return;
-}
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-return;
-}
-let relPx = f32(outputIdx);
-let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
-let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-return;
-}
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
-let centerX = (pixelMinX + pixelMaxX) * 0.5;
-if (startIdx >= endIdx) {
-var bestIdx = startIdx;
-if (startIdx > 0u && startIdx < count) {
-let distPrev = abs(dataX[startIdx - 1u] - centerX);
-let distCurr = abs(dataX[startIdx] - centerX);
-if (distPrev < distCurr) {
-bestIdx = startIdx - 1u;
-}
-} else if (startIdx >= count && count > 0u) {
-bestIdx = count - 1u;
-}
-// The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
-// edge is drawn even when the half nearer to that neighbour lies entirely off screen.
-if (outputIdx == 0u && startIdx > 0u) {
-bestIdx = startIdx - 1u;
-}
-if (outputIdx + 1u == maxCols && startIdx < count) {
-bestIdx = startIdx;
-}
-if (bestIdx >= count) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-return;
-}
-let y = dataY[bestIdx];
-if (y < -1.0e38) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-return;
-}
-let normY = (y - u.viewMinY) / viewRangeY;
-let screenY = 1.0 - normY;
-let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
-let screenX = normX;
-lineData[outputIdx] = LineData(screenX, screenY, screenY, 1.0);
-return;
-}
-var dataMinY = 3.0e38;
-var dataMaxY = -3.0e38;
-let rangeCount = endIdx - startIdx;
-let maxSamples = lu.maxSamplesPerPixel;
-if (maxSamples > 1u && rangeCount > maxSamples) {
-let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
-for (var s = 0u; s < maxSamples; s++) {
-let idx = startIdx + u32(f32(s) * stride);
-if (idx < endIdx) {
-let y = dataY[idx];
-if (y > -1.0e38) {
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-}
-}
-}
-let lastY = dataY[endIdx - 1u];
-if (lastY > -1.0e38) {
-dataMinY = min(dataMinY, lastY);
-dataMaxY = max(dataMaxY, lastY);
-}
-} else {
-for (var i = startIdx; i < endIdx; i++) {
-let y = dataY[i];
-if (y > -1.0e38) {
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-}
-}
-}
-if (dataMaxY < dataMinY) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-return;
-}
-// The vertex of a column that holds samples sits at the middle of those samples, not at the
-// pixel centre: the empty columns on either side collapse onto their nearest sample, so a
-// vertex left or right of that sample folds the strip back over itself and the overlap
-// shows as a darker seam wherever the fill is blended.
-let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
-let screenX = normX;
-let normMaxY = (dataMaxY - u.viewMinY) / viewRangeY;
-let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
-let minScreenY = 1.0 - normMaxY;
-let maxScreenY = 1.0 - normMinY;
-lineData[outputIdx] = LineData(screenX, minScreenY, maxScreenY, 1.0);
-}
-`;
-var LINE_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct LineData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> lineData: array<LineData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) alpha: f32,
-@location(1) @interpolate(flat) seriesIdx: u32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
-let segIdx = vi / 2u;
-let endpoint = vi % 2u;
-if (segIdx < maxCols) {
-let d = lineData[segIdx];
-let y = select(d.maxScreenY, d.minScreenY, endpoint == 0u);
-out.pos = vec4f(d.screenX * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, d.valid);
-out.alpha = d.valid;
-} else {
-let connIdx = segIdx - maxCols;
-if (connIdx + 1u >= maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.alpha = 0.0;
-return out;
-}
-let d0 = lineData[connIdx];
-let d1 = lineData[connIdx + 1u];
-let segValid = min(d0.valid, d1.valid);
-if (endpoint == 0u) {
-let midY = (d0.minScreenY + d0.maxScreenY) * 0.5;
-out.pos = vec4f(d0.screenX * 2.0 - 1.0, 1.0 - midY * 2.0, 0.0, segValid);
-} else {
-let midY = (d1.minScreenY + d1.maxScreenY) * 0.5;
-out.pos = vec4f(d1.screenX * 2.0 - 1.0, 1.0 - midY * 2.0, 0.0, segValid);
-}
-out.alpha = segValid;
-}
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.alpha < 0.1) { discard; }
-let series = allSeries[in.seriesIdx];
-// Every series but the hovered one steps back toward the background while a highlight is
-// set; mixed into the colour rather than the alpha, since the line passes do not blend.
-let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
-return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
-}
-`;
+var LINE_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct LineUniforms{maxSamplesPerPixel: u32,_p1: u32,_p2: u32,_p3: u32};struct LineData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var<storage,read_write> lineData: array<LineData>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> lu: LineUniforms;${BINARY_SEARCH}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let outputIdx = id.x;let maxCols = u32(u.width);let count = u.pointCount;if(outputIdx >= maxCols || count == 0u){if(outputIdx < maxCols){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);}return;}let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;if(viewRangeX < 0.0001 || viewRangeY < 0.0001){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);return;}let relPx = f32(outputIdx);let pixelMinX = u.viewMinX +(relPx / u.width)* viewRangeX;let pixelMaxX = u.viewMinX +((relPx + 1.0)/ u.width)* viewRangeX;if(pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);return;}let startIdx = lowerBound(pixelMinX,count);var endIdx = lowerBound(pixelMaxX,count);endIdx = min(endIdx,count);let centerX =(pixelMinX + pixelMaxX)* 0.5;if(startIdx >= endIdx){var bestIdx = startIdx;if(startIdx > 0u && startIdx < count){let distPrev = abs(dataX[startIdx - 1u] - centerX);let distCurr = abs(dataX[startIdx] - centerX);if(distPrev < distCurr){bestIdx = startIdx - 1u;}}else if(startIdx >= count && count > 0u){bestIdx = count - 1u;}if(outputIdx == 0u && startIdx > 0u){bestIdx = startIdx - 1u;}if(outputIdx + 1u == maxCols && startIdx < count){bestIdx = startIdx;}if(bestIdx >= count){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);return;}let y = dataY[bestIdx];if(y < -1.0e38){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);return;}let normY =(y - u.viewMinY)/ viewRangeY;let screenY = 1.0 - normY;let normX =(dataX[bestIdx] - u.viewMinX)/ viewRangeX;let screenX = normX;lineData[outputIdx] = LineData(screenX,screenY,screenY,1.0);return;}var dataMinY = 3.0e38;var dataMaxY = -3.0e38;let rangeCount = endIdx - startIdx;let maxSamples = lu.maxSamplesPerPixel;if(maxSamples > 1u && rangeCount > maxSamples){let stride = f32(rangeCount - 1u)/ f32(maxSamples - 1u);for(var s = 0u;s < maxSamples;s++){let idx = startIdx + u32(f32(s)* stride);if(idx < endIdx){let y = dataY[idx];if(y > -1.0e38){dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);}}}let lastY = dataY[endIdx - 1u];if(lastY > -1.0e38){dataMinY = min(dataMinY,lastY);dataMaxY = max(dataMaxY,lastY);}}else{for(var i = startIdx;i < endIdx;i++){let y = dataY[i];if(y > -1.0e38){dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);}}}if(dataMaxY < dataMinY){lineData[outputIdx] = LineData(-1.0,-1.0,-1.0,0.0);return;}let normX =((dataX[startIdx] + dataX[endIdx - 1u])* 0.5 - u.viewMinX)/ viewRangeX;let screenX = normX;let normMaxY =(dataMaxY - u.viewMinY)/ viewRangeY;let normMinY =(dataMinY - u.viewMinY)/ viewRangeY;let minScreenY = 1.0 - normMaxY;let maxScreenY = 1.0 - normMinY;lineData[outputIdx] = LineData(screenX,minScreenY,maxScreenY,1.0);}`;
+var LINE_RENDER_SHADER = `${UNIFORM_STRUCT}struct LineData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> lineData: array<LineData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)alpha: f32,@location(1)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;let maxCols = u32(u.width);let segIdx = vi / 2u;let endpoint = vi % 2u;if(segIdx < maxCols){let d = lineData[segIdx];let y = select(d.maxScreenY,d.minScreenY,endpoint == 0u);out.pos = vec4f(d.screenX * 2.0 - 1.0,1.0 - y * 2.0,0.0,d.valid);out.alpha = d.valid;}else{let connIdx = segIdx - maxCols;if(connIdx + 1u >= maxCols){out.pos = vec4f(0.0,0.0,0.0,0.0);out.alpha = 0.0;return out;}let d0 = lineData[connIdx];let d1 = lineData[connIdx + 1u];let segValid = min(d0.valid,d1.valid);if(endpoint == 0u){let midY =(d0.minScreenY + d0.maxScreenY)* 0.5;out.pos = vec4f(d0.screenX * 2.0 - 1.0,1.0 - midY * 2.0,0.0,segValid);}else{let midY =(d1.minScreenY + d1.maxScreenY)* 0.5;out.pos = vec4f(d1.screenX * 2.0 - 1.0,1.0 - midY * 2.0,0.0,segValid);}out.alpha = segValid;}return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.alpha < 0.1){discard;}let series = allSeries[in.seriesIdx];let dim = select(1.0,0.35,u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);return vec4f(mix(vec3f(u.bgR,u.bgG,u.bgB),series.color.rgb,dim),1.0);}`;
 
 // src/shaders/highlight.ts
-var LINE_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}
-struct ColData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> cols: array<ColData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) seriesIdx: u32,
-};
-// The hovered series once more as a ribbon: two triangles per pixel-column segment, 1.5 px
-// to each side of the centre line the normal pass draws, on top of everything else.
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-let maxCols = u32(u.width);
-let seg = vi / 6u;
-if (seg + 1u >= maxCols) { return out; }
-let d0 = cols[seg];
-let d1 = cols[seg + 1u];
-if (min(d0.valid, d1.valid) < 0.5) { return out; }
-let p0 = vec2f(d0.screenX * u.width, (d0.minScreenY + d0.maxScreenY) * 0.5 * u.height);
-let p1 = vec2f(d1.screenX * u.width, (d1.minScreenY + d1.maxScreenY) * 0.5 * u.height);
-let dir = p1 - p0;
-let len = length(dir);
-if (len < 1e-4) { return out; }
-let n = vec2f(-dir.y, dir.x) / len * 1.5;
-let k = vi % 6u;
-var pt = p0 + n;
-if (k == 1u || k == 3u) { pt = p0 - n; }
-if (k == 2u || k == 5u) { pt = p1 + n; }
-if (k == 4u) { pt = p1 - n; }
-out.pos = vec4f(pt.x / u.width * 2.0 - 1.0, 1.0 - pt.y / u.height * 2.0, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 1.0);
-}
-`;
-var ERROR_BAND_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}
-struct ColData {
-screenX: f32,
-loScreenY: f32,
-hiScreenY: f32,
-centerScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> cols: array<ColData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) seriesIdx: u32,
-};
-// The hovered series once more as a ribbon: two triangles per pixel-column segment, 1.5 px
-// to each side of the centre line the normal pass draws, on top of everything else.
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-let maxCols = u32(u.width);
-let seg = vi / 6u;
-if (seg + 1u >= maxCols) { return out; }
-let d0 = cols[seg];
-let d1 = cols[seg + 1u];
-if (min(d0.valid, d1.valid) < 0.5) { return out; }
-let p0 = vec2f(d0.screenX * u.width, d0.centerScreenY * u.height);
-let p1 = vec2f(d1.screenX * u.width, d1.centerScreenY * u.height);
-let dir = p1 - p0;
-let len = length(dir);
-if (len < 1e-4) { return out; }
-let n = vec2f(-dir.y, dir.x) / len * 1.5;
-let k = vi % 6u;
-var pt = p0 + n;
-if (k == 1u || k == 3u) { pt = p0 - n; }
-if (k == 2u || k == 5u) { pt = p1 + n; }
-if (k == 4u) { pt = p1 - n; }
-out.pos = vec4f(pt.x / u.width * 2.0 - 1.0, 1.0 - pt.y / u.height * 2.0, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 1.0);
-}
-`;
+var LINE_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}struct ColData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> cols: array<ColData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.pos = vec4f(0.0,0.0,0.0,0.0);let maxCols = u32(u.width);let seg = vi / 6u;if(seg + 1u >= maxCols){return out;}let d0 = cols[seg];let d1 = cols[seg + 1u];if(min(d0.valid,d1.valid)< 0.5){return out;}let p0 = vec2f(d0.screenX * u.width,(d0.minScreenY + d0.maxScreenY)* 0.5 * u.height);let p1 = vec2f(d1.screenX * u.width,(d1.minScreenY + d1.maxScreenY)* 0.5 * u.height);let dir = p1 - p0;let len = length(dir);if(len < 1e-4){return out;}let n = vec2f(-dir.y,dir.x)/ len * 1.5;let k = vi % 6u;var pt = p0 + n;if(k == 1u || k == 3u){pt = p0 - n;}if(k == 2u || k == 5u){pt = p1 + n;}if(k == 4u){pt = p1 - n;}out.pos = vec4f(pt.x / u.width * 2.0 - 1.0,1.0 - pt.y / u.height * 2.0,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let series = allSeries[in.seriesIdx];return vec4f(series.color.rgb,1.0);}`;
+var ERROR_BAND_HIGHLIGHT_SHADER = `${UNIFORM_STRUCT}struct ColData{screenX: f32,loScreenY: f32,hiScreenY: f32,centerScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> cols: array<ColData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.pos = vec4f(0.0,0.0,0.0,0.0);let maxCols = u32(u.width);let seg = vi / 6u;if(seg + 1u >= maxCols){return out;}let d0 = cols[seg];let d1 = cols[seg + 1u];if(min(d0.valid,d1.valid)< 0.5){return out;}let p0 = vec2f(d0.screenX * u.width,d0.centerScreenY * u.height);let p1 = vec2f(d1.screenX * u.width,d1.centerScreenY * u.height);let dir = p1 - p0;let len = length(dir);if(len < 1e-4){return out;}let n = vec2f(-dir.y,dir.x)/ len * 1.5;let k = vi % 6u;var pt = p0 + n;if(k == 1u || k == 3u){pt = p0 - n;}if(k == 2u || k == 5u){pt = p1 + n;}if(k == 4u){pt = p1 - n;}out.pos = vec4f(pt.x / u.width * 2.0 - 1.0,1.0 - pt.y / u.height * 2.0,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let series = allSeries[in.seriesIdx];return vec4f(series.color.rgb,1.0);}`;
 
 // src/charts/line.ts
 var LineChart = {
@@ -2821,58 +2367,7 @@ var LineChart = {
   ]
 };
 // src/shaders/area.ts
-var AREA_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct LineData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> lineData: array<LineData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) seriesIdx: u32,
-@location(1) @interpolate(flat) valid: f32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.valid = 0.0;
-let maxCols = u32(u.width);
-if (vi >= maxCols * 2u) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let col = vi / 2u;
-let onLine = (vi % 2u) == 0u;
-let d = lineData[col];
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let baseline = select(1.0, 1.0 - (u.dataMinY - u.viewMinY) / viewRangeY, viewRangeY > 0.0001);
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let leftBound = select(0.0, clamp((u.dataMinX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-let rightBound = select(1.0, clamp((u.dataMaxX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-var sx = clamp(d.screenX, leftBound, rightBound);
-var py = select(baseline, (d.minScreenY + d.maxScreenY) * 0.5, onLine);
-if (d.valid < 0.5 && vi > 0u) {
-let prevCol = (vi - 1u) / 2u;
-let pd = lineData[prevCol];
-sx = clamp(pd.screenX, leftBound, rightBound);
-py = select(baseline, (pd.minScreenY + pd.maxScreenY) * 0.5, (vi - 1u) % 2u == 0u);
-}
-let clipX = sx * 2.0 - 1.0;
-let clipY = 1.0 - py * 2.0;
-out.valid = d.valid;
-out.pos = vec4f(clipX, clipY, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.valid < 0.5) { discard; }
-let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 1.0);
-}
-`;
+var AREA_RENDER_SHADER = `${UNIFORM_STRUCT}struct LineData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> lineData: array<LineData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)seriesIdx: u32,@location(1)@interpolate(flat)valid: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.valid = 0.0;let maxCols = u32(u.width);if(vi >= maxCols * 2u){out.pos = vec4f(0.0,0.0,0.0,0.0);return out;}let col = vi / 2u;let onLine =(vi % 2u)== 0u;let d = lineData[col];let viewRangeY = u.viewMaxY - u.viewMinY;let baseline = select(1.0,1.0 -(u.dataMinY - u.viewMinY)/ viewRangeY,viewRangeY > 0.0001);let viewRangeX = u.viewMaxX - u.viewMinX;let leftBound = select(0.0,clamp((u.dataMinX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);let rightBound = select(1.0,clamp((u.dataMaxX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);var sx = clamp(d.screenX,leftBound,rightBound);var py = select(baseline,(d.minScreenY + d.maxScreenY)* 0.5,onLine);if(d.valid < 0.5 && vi > 0u){let prevCol =(vi - 1u)/ 2u;let pd = lineData[prevCol];sx = clamp(pd.screenX,leftBound,rightBound);py = select(baseline,(pd.minScreenY + pd.maxScreenY)* 0.5,(vi - 1u)% 2u == 0u);}let clipX = sx * 2.0 - 1.0;let clipY = 1.0 - py * 2.0;out.valid = d.valid;out.pos = vec4f(clipX,clipY,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.valid < 0.5){discard;}let series = allSeries[in.seriesIdx];return vec4f(series.color.rgb,1.0);}`;
 
 // src/charts/area.ts
 var AreaChart = {
@@ -2925,66 +2420,7 @@ var AreaChart = {
   ]
 };
 // src/shaders/scatter.ts
-var SCATTER_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct ScatterUniforms { dispatchXCount: u32, pointSize: f32 };
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var outputTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform> su: ScatterUniforms;
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let series = allSeries[seriesIdx.index];
-let visStart = series.visibleRange.x;
-let visCount = series.visibleRange.y;
-let localIdx = id.y * su.dispatchXCount + id.x;
-if (localIdx >= visCount) { return; }
-let idx = visStart + localIdx;
-let count = u.pointCount;
-if (idx >= count) { return; }
-let x = dataX[idx];
-let y = dataY[idx];
-if (y < u.viewMinY || y > u.viewMaxY) { return; }
-let width = u32(u.width);
-let height = u32(u.height);
-let rangeX = u.viewMaxX - u.viewMinX;
-let rangeY = u.viewMaxY - u.viewMinY;
-if (rangeX < 0.0001 || rangeY < 0.0001) { return; }
-let normX = (x - u.viewMinX) / rangeX;
-let normY = (y - u.viewMinY) / rangeY;
-let screenX = normX;
-let screenY = 1.0 - normY;
-let pixelX = i32(screenX * f32(width));
-let pixelY = i32(screenY * f32(height));
-if (idx > visStart) {
-let prevX = dataX[idx - 1u];
-let prevY = dataY[idx - 1u];
-let prevNormX = (prevX - u.viewMinX) / rangeX;
-let prevNormY = (prevY - u.viewMinY) / rangeY;
-let prevPx = i32(prevNormX * f32(width));
-let prevPy = i32((1.0 - prevNormY) * f32(height));
-if (pixelX == prevPx && pixelY == prevPy) { return; }
-}
-let iWidth = i32(width);
-let iHeight = i32(height);
-if (pixelX < 0 || pixelX >= iWidth) { return; }
-if (pixelY < 0 || pixelY >= iHeight) { return; }
-let color = series.color;
-let radius = i32(su.pointSize);
-for (var dy = -radius; dy <= radius; dy++) {
-for (var dx = -radius; dx <= radius; dx++) {
-if (dx * dx + dy * dy > radius * radius) { continue; }
-let px = pixelX + dx;
-let py = pixelY + dy;
-if (px >= 0 && px < iWidth && py >= 0 && py < iHeight) {
-textureStore(outputTex, vec2i(px, py), color);
-}
-}
-}
-}
-`;
+var SCATTER_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct ScatterUniforms{dispatchXCount: u32,pointSize: f32};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var outputTex: texture_storage_2d<rgba8unorm,write>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(6)var<uniform> su: ScatterUniforms;@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let series = allSeries[seriesIdx.index];let visStart = series.visibleRange.x;let visCount = series.visibleRange.y;let localIdx = id.y * su.dispatchXCount + id.x;if(localIdx >= visCount){return;}let idx = visStart + localIdx;let count = u.pointCount;if(idx >= count){return;}let x = dataX[idx];let y = dataY[idx];if(y < u.viewMinY || y > u.viewMaxY){return;}let width = u32(u.width);let height = u32(u.height);let rangeX = u.viewMaxX - u.viewMinX;let rangeY = u.viewMaxY - u.viewMinY;if(rangeX < 0.0001 || rangeY < 0.0001){return;}let normX =(x - u.viewMinX)/ rangeX;let normY =(y - u.viewMinY)/ rangeY;let screenX = normX;let screenY = 1.0 - normY;let pixelX = i32(screenX * f32(width));let pixelY = i32(screenY * f32(height));if(idx > visStart){let prevX = dataX[idx - 1u];let prevY = dataY[idx - 1u];let prevNormX =(prevX - u.viewMinX)/ rangeX;let prevNormY =(prevY - u.viewMinY)/ rangeY;let prevPx = i32(prevNormX * f32(width));let prevPy = i32((1.0 - prevNormY)* f32(height));if(pixelX == prevPx && pixelY == prevPy){return;}}let iWidth = i32(width);let iHeight = i32(height);if(pixelX < 0 || pixelX >= iWidth){return;}if(pixelY < 0 || pixelY >= iHeight){return;}let color = series.color;let radius = i32(su.pointSize);for(var dy = -radius;dy <= radius;dy++){for(var dx = -radius;dx <= radius;dx++){if(dx * dx + dy * dy > radius * radius){continue;}let px = pixelX + dx;let py = pixelY + dy;if(px >= 0 && px < iWidth && py >= 0 && py < iHeight){textureStore(outputTex,vec2i(px,py),color);}}}}`;
 
 // src/charts/scatter.ts
 var MAX_WG_DIM = 65535;
@@ -3021,199 +2457,8 @@ var ScatterChart = {
   ]
 };
 // src/shaders/box.ts
-var BOX_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct BarUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
-struct BarData {
-screenX: f32,
-minY: f32,
-maxY: f32,
-barWidth: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var<storage, read_write> barData: array<BarData>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform> bu: BarUniforms;
-${BINARY_SEARCH}
-fn barHalfWidth(idx: u32, count: u32) -> f32 {
-if (count <= 1u) {
-return (u.viewMaxX - u.viewMinX) * 0.4;
-}
-var spacing: f32;
-if (idx == 0u) {
-spacing = dataX[1u] - dataX[0u];
-} else if (idx >= count - 1u) {
-spacing = dataX[count - 1u] - dataX[count - 2u];
-} else {
-spacing = min(dataX[idx + 1u] - dataX[idx], dataX[idx] - dataX[idx - 1u]);
-}
-let seriesCount = max(1u, u.seriesCount);
-return (spacing * 0.4) / f32(seriesCount);
-}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
-}
-return;
-}
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
-barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
-return;
-}
-let relPx = f32(outputIdx);
-let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
-let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
-let centerX = (pixelMinX + pixelMaxX) * 0.5;
-let onePixel = 1.0 / u.width;
-if (startIdx >= endIdx) {
-var hit = false;
-var bestX: f32 = 0.0;
-var bestY: f32 = 0.0;
-var bestHW: f32 = 0.0;
-var bestDist: f32 = 1e10;
-if (startIdx < count) {
-let bx = dataX[startIdx];
-let hw = barHalfWidth(startIdx, count);
-if (pixelMinX < bx + hw && pixelMaxX > bx - hw) {
-let d = abs(bx - centerX);
-bestX = bx; bestY = dataY[startIdx]; bestHW = hw; bestDist = d;
-hit = true;
-}
-}
-if (startIdx > 0u) {
-let prev = startIdx - 1u;
-let bx = dataX[prev];
-let hw = barHalfWidth(prev, count);
-if (pixelMinX < bx + hw && pixelMaxX > bx - hw) {
-let d = abs(bx - centerX);
-if (d < bestDist) {
-bestX = bx; bestY = dataY[prev]; bestHW = hw; bestDist = d;
-}
-hit = true;
-}
-}
-if (!hit) {
-barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
-return;
-}
-let seriesCount = max(1u, u.seriesCount);
-let barOffset = (f32(seriesIdx.index) - f32(seriesCount - 1u) * 0.5) * (bestHW * 2.0);
-let offsetX = bestX + barOffset;
-let normX = (offsetX - u.viewMinX) / viewRangeX;
-let fullWidth = bestHW * 2.0 / viewRangeX;
-let gapSize = max(onePixel, fullWidth * 0.05);
-let bw = max(fullWidth - gapSize, onePixel);
-barData[outputIdx] = BarData(normX, bestY, bestY, bw);
-return;
-}
-var dataMinY = dataY[startIdx];
-var dataMaxY = dataY[startIdx];
-let rangeCount = endIdx - startIdx;
-let maxSamples = bu.maxSamplesPerPixel;
-if (maxSamples > 0u && rangeCount > maxSamples) {
-let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
-for (var s = 0u; s < maxSamples; s++) {
-let idx = startIdx + u32(f32(s) * stride);
-if (idx < endIdx) {
-let y = dataY[idx];
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-}
-}
-let lastY = dataY[endIdx - 1u];
-dataMinY = min(dataMinY, lastY);
-dataMaxY = max(dataMaxY, lastY);
-} else {
-for (var i = startIdx + 1u; i < endIdx; i++) {
-let y = dataY[i];
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-}
-}
-let hw = barHalfWidth(startIdx, count);
-let fullWidth = hw * 2.0 / viewRangeX;
-let gapSize = max(onePixel, fullWidth * 0.05);
-let bw = max(fullWidth - gapSize, onePixel);
-let seriesCount = max(1u, u.seriesCount);
-let barOffset = (f32(seriesIdx.index) - f32(seriesCount - 1u) * 0.5) * (hw * 2.0);
-let dataX_centered = dataX[startIdx] + barOffset;
-let normX = (dataX_centered - u.viewMinX) / viewRangeX;
-barData[outputIdx] = BarData(normX, dataMinY, dataMaxY, bw);
-}
-`;
-var BOX_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct BarData {
-screenX: f32,
-minY: f32,
-maxY: f32,
-barWidth: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> barData: array<BarData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) normY: f32,
-@location(1) @interpolate(flat) seriesIdx: u32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
-let colIdx = vi / 6u;
-let vertexType = vi % 6u;
-if (colIdx >= maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.normY = 0.0;
-return out;
-}
-let bd = barData[colIdx];
-if (bd.barWidth <= 0.0) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.normY = 0.0;
-return out;
-}
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
-let normMinY = (min(bd.minY, 0.0) - u.viewMinY) / safeRangeY;
-let normMaxY = (max(bd.maxY, 0.0) - u.viewMinY) / safeRangeY;
-let top = 1.0 - normMaxY;
-let bottom = 1.0 - normMinY;
-let halfW = bd.barWidth * 0.5;
-let left = bd.screenX - halfW;
-let right = bd.screenX + halfW;
-var positions = array<vec2f, 6>(
-vec2f(left, bottom),
-vec2f(right, bottom),
-vec2f(left, top),
-vec2f(left, top),
-vec2f(right, bottom),
-vec2f(right, top)
-);
-let screenPos = positions[vertexType];
-let clipX = screenPos.x * 2.0 - 1.0;
-let clipY = 1.0 - screenPos.y * 2.0;
-out.pos = vec4f(clipX, clipY, 0.0, 1.0);
-out.normY = normMaxY;
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 0.85);
-}
-`;
+var BOX_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct BarUniforms{maxSamplesPerPixel: u32,_p1: u32,_p2: u32,_p3: u32};struct BarData{screenX: f32,minY: f32,maxY: f32,barWidth: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var<storage,read_write> barData: array<BarData>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(6)var<uniform> bu: BarUniforms;${BINARY_SEARCH}fn barHalfWidth(idx: u32,count: u32)-> f32{if(count <= 1u){return(u.viewMaxX - u.viewMinX)* 0.4;}var spacing: f32;if(idx == 0u){spacing = dataX[1u] - dataX[0u];}else if(idx >= count - 1u){spacing = dataX[count - 1u] - dataX[count - 2u];}else{spacing = min(dataX[idx + 1u] - dataX[idx],dataX[idx] - dataX[idx - 1u]);}let seriesCount = max(1u,u.seriesCount);return(spacing * 0.4)/ f32(seriesCount);}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let outputIdx = id.x;let maxCols = u32(u.width);let count = u.pointCount;if(outputIdx >= maxCols || count == 0u){if(outputIdx < maxCols){barData[outputIdx] = BarData(0.0,0.0,0.0,0.0);}return;}let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;if(viewRangeX < 0.0001 || viewRangeY < 0.0001){barData[outputIdx] = BarData(0.0,0.0,0.0,0.0);return;}let relPx = f32(outputIdx);let pixelMinX = u.viewMinX +(relPx / u.width)* viewRangeX;let pixelMaxX = u.viewMinX +((relPx + 1.0)/ u.width)* viewRangeX;let startIdx = lowerBound(pixelMinX,count);var endIdx = lowerBound(pixelMaxX,count);endIdx = min(endIdx,count);let centerX =(pixelMinX + pixelMaxX)* 0.5;let onePixel = 1.0 / u.width;if(startIdx >= endIdx){var hit = false;var bestX: f32 = 0.0;var bestY: f32 = 0.0;var bestHW: f32 = 0.0;var bestDist: f32 = 1e10;if(startIdx < count){let bx = dataX[startIdx];let hw = barHalfWidth(startIdx,count);if(pixelMinX < bx + hw && pixelMaxX > bx - hw){let d = abs(bx - centerX);bestX = bx;bestY = dataY[startIdx];bestHW = hw;bestDist = d;hit = true;}}if(startIdx > 0u){let prev = startIdx - 1u;let bx = dataX[prev];let hw = barHalfWidth(prev,count);if(pixelMinX < bx + hw && pixelMaxX > bx - hw){let d = abs(bx - centerX);if(d < bestDist){bestX = bx;bestY = dataY[prev];bestHW = hw;bestDist = d;}hit = true;}}if(!hit){barData[outputIdx] = BarData(0.0,0.0,0.0,0.0);return;}let seriesCount = max(1u,u.seriesCount);let barOffset =(f32(seriesIdx.index)- f32(seriesCount - 1u)* 0.5)*(bestHW * 2.0);let offsetX = bestX + barOffset;let normX =(offsetX - u.viewMinX)/ viewRangeX;let fullWidth = bestHW * 2.0 / viewRangeX;let gapSize = max(onePixel,fullWidth * 0.05);let bw = max(fullWidth - gapSize,onePixel);barData[outputIdx] = BarData(normX,bestY,bestY,bw);return;}var dataMinY = dataY[startIdx];var dataMaxY = dataY[startIdx];let rangeCount = endIdx - startIdx;let maxSamples = bu.maxSamplesPerPixel;if(maxSamples > 0u && rangeCount > maxSamples){let stride = f32(rangeCount - 1u)/ f32(maxSamples - 1u);for(var s = 0u;s < maxSamples;s++){let idx = startIdx + u32(f32(s)* stride);if(idx < endIdx){let y = dataY[idx];dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);}}let lastY = dataY[endIdx - 1u];dataMinY = min(dataMinY,lastY);dataMaxY = max(dataMaxY,lastY);}else{for(var i = startIdx + 1u;i < endIdx;i++){let y = dataY[i];dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);}}let hw = barHalfWidth(startIdx,count);let fullWidth = hw * 2.0 / viewRangeX;let gapSize = max(onePixel,fullWidth * 0.05);let bw = max(fullWidth - gapSize,onePixel);let seriesCount = max(1u,u.seriesCount);let barOffset =(f32(seriesIdx.index)- f32(seriesCount - 1u)* 0.5)*(hw * 2.0);let dataX_centered = dataX[startIdx] + barOffset;let normX =(dataX_centered - u.viewMinX)/ viewRangeX;barData[outputIdx] = BarData(normX,dataMinY,dataMaxY,bw);}`;
+var BOX_RENDER_SHADER = `${UNIFORM_STRUCT}struct BarData{screenX: f32,minY: f32,maxY: f32,barWidth: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> barData: array<BarData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)normY: f32,@location(1)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;let maxCols = u32(u.width);let colIdx = vi / 6u;let vertexType = vi % 6u;if(colIdx >= maxCols){out.pos = vec4f(0.0,0.0,0.0,0.0);out.normY = 0.0;return out;}let bd = barData[colIdx];if(bd.barWidth <= 0.0){out.pos = vec4f(0.0,0.0,0.0,0.0);out.normY = 0.0;return out;}let viewRangeY = u.viewMaxY - u.viewMinY;let safeRangeY = select(viewRangeY,1.0,viewRangeY < 0.0001);let normMinY =(min(bd.minY,0.0)- u.viewMinY)/ safeRangeY;let normMaxY =(max(bd.maxY,0.0)- u.viewMinY)/ safeRangeY;let top = 1.0 - normMaxY;let bottom = 1.0 - normMinY;let halfW = bd.barWidth * 0.5;let left = bd.screenX - halfW;let right = bd.screenX + halfW;var positions = array<vec2f,6>(vec2f(left,bottom),vec2f(right,bottom),vec2f(left,top),vec2f(left,top),vec2f(right,bottom),vec2f(right,top));let screenPos = positions[vertexType];let clipX = screenPos.x * 2.0 - 1.0;let clipY = 1.0 - screenPos.y * 2.0;out.pos = vec4f(clipX,clipY,0.0,1.0);out.normY = normMaxY;return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let series = allSeries[in.seriesIdx];return vec4f(series.color.rgb,0.85);}`;
 
 // src/charts/bar.ts
 var BarChart = {
@@ -3300,198 +2545,8 @@ fn effectiveInterval() -> f32 {
   }
   return raw;
 }`;
-var CANDLESTICK_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-${CANDLE_TYPES}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read>       dataX:     array<f32>;
-@group(0) @binding(2) var<storage, read>       dataClose: array<f32>;
-@group(0) @binding(3) var<storage, read_write> candleData: array<CandleData>;
-@group(0) @binding(4) var<storage, read>       allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform>             seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform>             cu: CandleUniforms;
-@group(0) @binding(7) var<storage, read>       dataOpen: array<f32>;
-@group(0) @binding(8) var<storage, read>       dataHigh: array<f32>;
-@group(0) @binding(9) var<storage, read>       dataLow:  array<f32>;
-${BINARY_SEARCH}
-${EFFECTIVE_INTERVAL}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let binIdx     = id.x;
-let totalPixels = u32(u.width);
-let count      = u.pointCount;
-if (count == 0u) {
-  if (binIdx < totalPixels) { candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0); }
-  return;
-}
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
-  if (binIdx < totalPixels) { candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0); }
-  return;
-}
-let interval     = effectiveInterval();
-let alignedStart = floor(u.viewMinX / interval) * interval;
-let numBins      = min(u32(ceil(viewRangeX / interval)) + 2u, totalPixels);
-if (binIdx >= numBins) { return; }
-let binMinX = alignedStart + f32(binIdx) * interval;
-let binMaxX = binMinX + interval;
-if (binMinX >= u.viewMaxX) {
-  candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);
-  return;
-}
-let binMidX  = binMinX + interval * 0.5;
-let screenX  = (binMidX - u.viewMinX) / viewRangeX;
-let barWidth = interval / viewRangeX;
-let onePixel = 1.0 / u.width;
-let bw       = max(barWidth * 0.95, onePixel);
-let startIdx = lowerBound(binMinX, count);
-var endIdx   = lowerBound(binMaxX, count);
-endIdx = min(endIdx, count);
-if (startIdx >= endIdx) {
-  // No data starts in this interval — find nearest candle that visually overlaps
-  var bestIdx:  u32  = 0u;
-  var bestDist: f32  = 1e10;
-  var hit = false;
-  if (startIdx < count) {
-    let bx = dataX[startIdx];
-    let hw = interval * 0.5;
-    if (binMinX < bx + hw && binMaxX > bx - hw) {
-      bestIdx = startIdx; bestDist = abs(bx - binMidX); hit = true;
-    }
-  }
-  if (startIdx > 0u) {
-    let prev = startIdx - 1u;
-    let bx   = dataX[prev];
-    let hw   = interval * 0.5;
-    if (binMinX < bx + hw && binMaxX > bx - hw) {
-      let d = abs(bx - binMidX);
-      if (!hit || d < bestDist) { bestIdx = prev; }
-      hit = true;
-    }
-  }
-  if (!hit) {
-    candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);
-    return;
-  }
-  let o = dataOpen[bestIdx];
-  let h = dataHigh[bestIdx];
-  let l = dataLow[bestIdx];
-  let c = dataClose[bestIdx];
-  candleData[binIdx] = CandleData(screenX, bw, l, min(o,c), max(o,c), h, select(0.0,1.0,c>=o));
-  return;
-}
-// Aggregate OHLC across all data points in this interval
-let o        = dataOpen[startIdx];
-var h        = dataHigh[startIdx];
-var l        = dataLow[startIdx];
-let c        = dataClose[endIdx - 1u];
-let rangeCount  = endIdx - startIdx;
-let maxSamples  = u32(cu.maxSamples);
-if (maxSamples > 0u && rangeCount > maxSamples) {
-  let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
-  for (var s = 0u; s < maxSamples; s++) {
-    let idx = startIdx + u32(f32(s) * stride);
-    if (idx < endIdx) { h = max(h, dataHigh[idx]); l = min(l, dataLow[idx]); }
-  }
-  h = max(h, dataHigh[endIdx - 1u]);
-  l = min(l, dataLow[endIdx - 1u]);
-} else {
-  for (var i = startIdx; i < endIdx; i++) {
-    h = max(h, dataHigh[i]); l = min(l, dataLow[i]);
-  }
-}
-candleData[binIdx] = CandleData(screenX, bw, l, min(o,c), max(o,c), h, select(0.0,1.0,c>=o));
-}
-`;
-var CANDLESTICK_RENDER_SHADER = `${UNIFORM_STRUCT}
-${CANDLE_TYPES}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> candleData: array<CandleData>;
-@group(0) @binding(2) var<uniform>       cu: CandleUniforms;
-${EFFECTIVE_INTERVAL}
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) isUp:   f32,
-@location(1) @interpolate(flat) isWick: f32,
-};
-// 5 sections × 6 vertices = 30 per column
-// 0=body  1=upper-wick  2=lower-wick  3=upper-cap  4=lower-cap
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
-var out: VertexOutput;
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let interval   = effectiveInterval();
-let numBins    = min(u32(ceil(viewRangeX / interval)) + 2u, u32(u.width));
-let colIdx     = vi / 30u;
-let localVi    = vi % 30u;
-let section    = localVi / 6u;
-let vertexType = localVi % 6u;
-if (colIdx >= numBins) {
-  out.pos = vec4f(0.0,0.0,0.0,0.0); out.isUp = 0.0; out.isWick = 0.0; return out;
-}
-let cd = candleData[colIdx];
-if (cd.barWidth <= 0.0) {
-  out.pos = vec4f(0.0,0.0,0.0,0.0); out.isUp = 0.0; out.isWick = 0.0; return out;
-}
-out.isUp   = cd.isUp;
-out.isWick = select(0.0, 1.0, section > 0u);
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
-let onePixelX  = 1.0 / u.width;
-let onePixelY  = 1.0 / u.height;
-var sLeft: f32; var sRight: f32; var sTop: f32; var sBottom: f32;
-if (section == 0u) {
-  let nb = (cd.bodyBottom - u.viewMinY) / safeRangeY;
-  let nt = (cd.bodyTop    - u.viewMinY) / safeRangeY;
-  sBottom = 1.0 - nb; sTop = 1.0 - nt;
-  let hw = cd.barWidth * 0.5;
-  sLeft = cd.screenX - hw; sRight = cd.screenX + hw;
-} else if (section == 1u) {
-  let nb = (cd.bodyTop - u.viewMinY) / safeRangeY;
-  let nt = (cd.high    - u.viewMinY) / safeRangeY;
-  sBottom = 1.0 - nb; sTop = 1.0 - nt;
-  let hw = max(onePixelX, cd.barWidth * 0.08);
-  sLeft = cd.screenX - hw; sRight = cd.screenX + hw;
-} else if (section == 2u) {
-  let nb = (cd.low        - u.viewMinY) / safeRangeY;
-  let nt = (cd.bodyBottom - u.viewMinY) / safeRangeY;
-  sBottom = 1.0 - nb; sTop = 1.0 - nt;
-  let hw = max(onePixelX, cd.barWidth * 0.08);
-  sLeft = cd.screenX - hw; sRight = cd.screenX + hw;
-} else if (section == 3u) {
-  let sy     = 1.0 - (cd.high - u.viewMinY) / safeRangeY;
-  let wickHW = max(onePixelX, cd.barWidth * 0.08);
-  let capHH  = wickHW * u.width / u.height;
-  sTop = sy - capHH; sBottom = sy + capHH;
-  let hw = max(onePixelX * 2.0, cd.barWidth * 0.28);
-  sLeft = cd.screenX - hw; sRight = cd.screenX + hw;
-} else {
-  let sy     = 1.0 - (cd.low - u.viewMinY) / safeRangeY;
-  let wickHW = max(onePixelX, cd.barWidth * 0.08);
-  let capHH  = wickHW * u.width / u.height;
-  sTop = sy - capHH; sBottom = sy + capHH;
-  let hw = max(onePixelX * 2.0, cd.barWidth * 0.28);
-  sLeft = cd.screenX - hw; sRight = cd.screenX + hw;
-}
-var positions = array<vec2f, 6>(
-  vec2f(sLeft,  sBottom),
-  vec2f(sRight, sBottom),
-  vec2f(sLeft,  sTop),
-  vec2f(sLeft,  sTop),
-  vec2f(sRight, sBottom),
-  vec2f(sRight, sTop)
-);
-let sp = positions[vertexType];
-out.pos = vec4f(sp.x * 2.0 - 1.0, 1.0 - sp.y * 2.0, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let upRgb   = unpack4x8unorm(cu.upColor).rgb;
-let downRgb = unpack4x8unorm(cu.downColor).rgb;
-let base  = select(downRgb, upRgb, in.isUp > 0.5);
-let color = select(base, base * 0.65, in.isWick > 0.5);
-return vec4f(color, 0.92);
-}
-`;
+var CANDLESTICK_COMPUTE_SHADER = `${UNIFORM_STRUCT}${CANDLE_TYPES}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataClose: array<f32>;@group(0)@binding(3)var<storage,read_write> candleData: array<CandleData>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(6)var<uniform> cu: CandleUniforms;@group(0)@binding(7)var<storage,read> dataOpen: array<f32>;@group(0)@binding(8)var<storage,read> dataHigh: array<f32>;@group(0)@binding(9)var<storage,read> dataLow: array<f32>;${BINARY_SEARCH}${EFFECTIVE_INTERVAL}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let binIdx = id.x;let totalPixels = u32(u.width);let count = u.pointCount;if(count == 0u){if(binIdx < totalPixels){candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);}return;}let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;if(viewRangeX < 0.0001 || viewRangeY < 0.0001){if(binIdx < totalPixels){candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);}return;}let interval = effectiveInterval();let alignedStart = floor(u.viewMinX / interval)* interval;let numBins = min(u32(ceil(viewRangeX / interval))+ 2u,totalPixels);if(binIdx >= numBins){return;}let binMinX = alignedStart + f32(binIdx)* interval;let binMaxX = binMinX + interval;if(binMinX >= u.viewMaxX){candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);return;}let binMidX = binMinX + interval * 0.5;let screenX =(binMidX - u.viewMinX)/ viewRangeX;let barWidth = interval / viewRangeX;let onePixel = 1.0 / u.width;let bw = max(barWidth * 0.95,onePixel);let startIdx = lowerBound(binMinX,count);var endIdx = lowerBound(binMaxX,count);endIdx = min(endIdx,count);if(startIdx >= endIdx){var bestIdx: u32 = 0u;var bestDist: f32 = 1e10;var hit = false;if(startIdx < count){let bx = dataX[startIdx];let hw = interval * 0.5;if(binMinX < bx + hw && binMaxX > bx - hw){bestIdx = startIdx;bestDist = abs(bx - binMidX);hit = true;}}if(startIdx > 0u){let prev = startIdx - 1u;let bx = dataX[prev];let hw = interval * 0.5;if(binMinX < bx + hw && binMaxX > bx - hw){let d = abs(bx - binMidX);if(!hit || d < bestDist){bestIdx = prev;}hit = true;}}if(!hit){candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);return;}let o = dataOpen[bestIdx];let h = dataHigh[bestIdx];let l = dataLow[bestIdx];let c = dataClose[bestIdx];candleData[binIdx] = CandleData(screenX,bw,l,min(o,c),max(o,c),h,select(0.0,1.0,c>=o));return;}let o = dataOpen[startIdx];var h = dataHigh[startIdx];var l = dataLow[startIdx];let c = dataClose[endIdx - 1u];let rangeCount = endIdx - startIdx;let maxSamples = u32(cu.maxSamples);if(maxSamples > 0u && rangeCount > maxSamples){let stride = f32(rangeCount - 1u)/ f32(maxSamples - 1u);for(var s = 0u;s < maxSamples;s++){let idx = startIdx + u32(f32(s)* stride);if(idx < endIdx){h = max(h,dataHigh[idx]);l = min(l,dataLow[idx]);}}h = max(h,dataHigh[endIdx - 1u]);l = min(l,dataLow[endIdx - 1u]);}else{for(var i = startIdx;i < endIdx;i++){h = max(h,dataHigh[i]);l = min(l,dataLow[i]);}}candleData[binIdx] = CandleData(screenX,bw,l,min(o,c),max(o,c),h,select(0.0,1.0,c>=o));}`;
+var CANDLESTICK_RENDER_SHADER = `${UNIFORM_STRUCT}${CANDLE_TYPES}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> candleData: array<CandleData>;@group(0)@binding(2)var<uniform> cu: CandleUniforms;${EFFECTIVE_INTERVAL}struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)isUp: f32,@location(1)@interpolate(flat)isWick: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32)-> VertexOutput{var out: VertexOutput;let viewRangeX = u.viewMaxX - u.viewMinX;let interval = effectiveInterval();let numBins = min(u32(ceil(viewRangeX / interval))+ 2u,u32(u.width));let colIdx = vi / 30u;let localVi = vi % 30u;let section = localVi / 6u;let vertexType = localVi % 6u;if(colIdx >= numBins){out.pos = vec4f(0.0,0.0,0.0,0.0);out.isUp = 0.0;out.isWick = 0.0;return out;}let cd = candleData[colIdx];if(cd.barWidth <= 0.0){out.pos = vec4f(0.0,0.0,0.0,0.0);out.isUp = 0.0;out.isWick = 0.0;return out;}out.isUp = cd.isUp;out.isWick = select(0.0,1.0,section > 0u);let viewRangeY = u.viewMaxY - u.viewMinY;let safeRangeY = select(viewRangeY,1.0,viewRangeY < 0.0001);let onePixelX = 1.0 / u.width;let onePixelY = 1.0 / u.height;var sLeft: f32;var sRight: f32;var sTop: f32;var sBottom: f32;if(section == 0u){let nb =(cd.bodyBottom - u.viewMinY)/ safeRangeY;let nt =(cd.bodyTop - u.viewMinY)/ safeRangeY;sBottom = 1.0 - nb;sTop = 1.0 - nt;let hw = cd.barWidth * 0.5;sLeft = cd.screenX - hw;sRight = cd.screenX + hw;}else if(section == 1u){let nb =(cd.bodyTop - u.viewMinY)/ safeRangeY;let nt =(cd.high - u.viewMinY)/ safeRangeY;sBottom = 1.0 - nb;sTop = 1.0 - nt;let hw = max(onePixelX,cd.barWidth * 0.08);sLeft = cd.screenX - hw;sRight = cd.screenX + hw;}else if(section == 2u){let nb =(cd.low - u.viewMinY)/ safeRangeY;let nt =(cd.bodyBottom - u.viewMinY)/ safeRangeY;sBottom = 1.0 - nb;sTop = 1.0 - nt;let hw = max(onePixelX,cd.barWidth * 0.08);sLeft = cd.screenX - hw;sRight = cd.screenX + hw;}else if(section == 3u){let sy = 1.0 -(cd.high - u.viewMinY)/ safeRangeY;let wickHW = max(onePixelX,cd.barWidth * 0.08);let capHH = wickHW * u.width / u.height;sTop = sy - capHH;sBottom = sy + capHH;let hw = max(onePixelX * 2.0,cd.barWidth * 0.28);sLeft = cd.screenX - hw;sRight = cd.screenX + hw;}else{let sy = 1.0 -(cd.low - u.viewMinY)/ safeRangeY;let wickHW = max(onePixelX,cd.barWidth * 0.08);let capHH = wickHW * u.width / u.height;sTop = sy - capHH;sBottom = sy + capHH;let hw = max(onePixelX * 2.0,cd.barWidth * 0.28);sLeft = cd.screenX - hw;sRight = cd.screenX + hw;}var positions = array<vec2f,6>(vec2f(sLeft,sBottom),vec2f(sRight,sBottom),vec2f(sLeft,sTop),vec2f(sLeft,sTop),vec2f(sRight,sBottom),vec2f(sRight,sTop));let sp = positions[vertexType];out.pos = vec4f(sp.x * 2.0 - 1.0,1.0 - sp.y * 2.0,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let upRgb = unpack4x8unorm(cu.upColor).rgb;let downRgb = unpack4x8unorm(cu.downColor).rgb;let base = select(downRgb,upRgb,in.isUp > 0.5);let color = select(base,base * 0.65,in.isWick > 0.5);return vec4f(color,0.92);}`;
 
 // src/charts/candlestick.ts
 var packRGB = (r, g, b) => (Math.round(r * 255) & 255 | (Math.round(g * 255) & 255) << 8 | (Math.round(b * 255) & 255) << 16 | 255 << 24) >>> 0;
@@ -3611,227 +2666,11 @@ fn boidToCell(pos: vec2f, gp: vec4f) -> vec2i {
     vec2i(0, 0), vec2i(i32(GRID_W) - 1, i32(GRID_H) - 1)
   );
 }`;
-var BOIDS_INIT_SHADER = `${UNIFORM_STRUCT}
-${BOID_STATE}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var<storage, read_write> boidsState: array<BoidState>;
-@group(0) @binding(4) var<uniform> seriesIdx: SeriesIndex;
-fn hash2(p: vec2f) -> vec2f {
-  let q = vec2f(dot(p, vec2f(127.1, 311.7)), dot(p, vec2f(269.5, 183.3)));
-  return fract(sin(q) * 43758.5453);
-}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
-  let b = boidsState[i];
-  if (b.vel.x == 0.0 && b.vel.y == 0.0) {
-    let seed = f32(seriesIdx.index * u.pointCount + i);
-    let rPos = hash2(vec2f(seed * 0.1, 1.7));
-    let rVel = hash2(vec2f(seed * 0.1, 0.5));
-    let a = rVel.x * 6.28318;
-    let spd = 0.002 + rVel.y * 0.003;
-    boidsState[i] = BoidState(
-      vec2f(rPos.x, rPos.y),
-      vec2f(cos(a) * spd, sin(a) * spd),
-      seriesIdx.index,
-      0u
-    );
-  }
-}`;
-var BOIDS_CLEAR_SHADER = `
-${GRID_HELPERS}
-@group(0) @binding(0) var<storage, read_write> gridCount: array<atomic<u32>>;
-@compute @workgroup_size(${GRID_W * GRID_H})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  atomicStore(&gridCount[id.x], 0u);
-}`;
-var BOIDS_INSERT_SHADER = `${UNIFORM_STRUCT}
-${BOID_STATE}
-${GRID_HELPERS}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> boidsState: array<BoidState>;
-@group(0) @binding(2) var<storage, read_write> gridCount: array<atomic<u32>>;
-@group(0) @binding(3) var<storage, read_write> gridBoids: array<u32>;
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
-  let gp   = gridParams(u.viewMinX, u.viewMaxX, u.viewMinY, u.viewMaxY);
-  let gc   = boidToCell(boidsState[i].pos, gp);
-  let cell = u32(gc.y * i32(GRID_W) + gc.x);
-  let slot = atomicAdd(&gridCount[cell], 1u);
-  if (slot < MAX_PER_CELL) {
-    gridBoids[cell * MAX_PER_CELL + slot] = i;
-  }
-}`;
-var BOIDS_SIM_SHADER = `${UNIFORM_STRUCT}
-${BOID_STATE}
-${GRID_HELPERS}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read_write> boidsState: array<BoidState>;
-@group(0) @binding(2) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(3) var<storage, read> gridCount: array<u32>;
-@group(0) @binding(4) var<storage, read> gridBoids: array<u32>;
-fn hash2(p: vec2f) -> vec2f { let q = vec2f(dot(p, vec2f(127.1, 311.7)), dot(p, vec2f(269.5, 183.3))); return fract(sin(q) * 43758.5453); }
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
-  let me = boidsState[i];
-
-  // Speed scales up when zoomed out, floor at MAX_SPD when zoomed in.
-  let viewRange = (u.viewMaxX - u.viewMinX + u.viewMaxY - u.viewMinY) * 0.5;
-  let dynMaxSpd = ${MAX_SPD} * max(viewRange, 1.0);
-
-  // Grid covers the padded view — params are the same in INSERT and SIM this frame.
-  let gp       = gridParams(u.viewMinX, u.viewMaxX, u.viewMinY, u.viewMaxY);
-  let cellSize = min(gp.x, gp.y); // perception radius = 2×cellSize (isotropic, safe with min)
-  let dynPer   = cellSize * 2.0;
-  let dynSep   = dynPer * ${SEP_R / PERCEPTION};
-  let perSq    = dynPer * dynPer;
-  let sepSq    = dynSep * dynSep;
-
-  var sep     = vec2f(0.0);
-  var align   = vec2f(0.0);
-  var coh     = vec2f(0.0);
-  var sameCnt = 0u;
-
-  // 5×5 grid neighbourhood — ±CLOSE_CELLS covers the full perception radius.
-  let lookahead = me.pos + me.vel;
-  let gc = boidToCell(me.pos, gp);
-  for (var dy = -${CLOSE_CELLS}; dy <= ${CLOSE_CELLS}; dy++) {
-    for (var dx = -${CLOSE_CELLS}; dx <= ${CLOSE_CELLS}; dx++) {
-      let nx = gc.x + dx;
-      let ny = gc.y + dy;
-      if (nx < 0 || nx >= i32(GRID_W) || ny < 0 || ny >= i32(GRID_H)) { continue; }
-      let cell = u32(ny * i32(GRID_W) + nx);
-      let cnt  = min(gridCount[cell], MAX_PER_CELL);
-      let base = cell * MAX_PER_CELL;
-      for (var s = 0u; s < cnt; s++) {
-        let j = gridBoids[base + s];
-        if (j == i) { continue; }
-        let o   = boidsState[j];
-        let d   = o.pos - lookahead;
-        let dSq = dot(d, d);
-        if (dSq < perSq && dSq > 1e-10) {
-          sameCnt += 1u;
-          if (dSq < sepSq) {
-            sep -= d / dSq; // d/dSq = d/(dist²), no sqrt needed
-          }
-          align += o.vel;
-          coh   += o.pos;
-        }
-      }
-    }
-  }
-
-  var accel = vec2f(0.0);
-  if (sameCnt > 0u) {
-    let fc = f32(sameCnt);
-
-    let sepMag = length(sep);
-    if (sepMag > 1e-9) {
-      accel += (sep / sepMag) * dynMaxSpd * ${W_SEP};
-    }
-
-    let avgVel = align / fc;
-    let avgSpd = length(avgVel);
-    if (avgSpd > 1e-9) {
-      accel += (avgVel / avgSpd * dynMaxSpd - me.vel) * ${W_ALIGN};
-    }
-
-    let toCenter    = coh / fc - me.pos;
-    let toCenterLen = length(toCenter);
-    if (toCenterLen > 1e-9) {
-      accel += (toCenter / toCenterLen * dynMaxSpd - me.vel) * ${W_COH};
-    }
-  }
-
-  let n = hash2(me.pos * 150.0 + vec2f(f32(i) * 0.013, 0.0));
-  accel += (n - 0.5) * (dynMaxSpd * ${W_NOISE});
-
-  // Rounded-square containment via a superellipse (L4 norm).
-  // p=4 gives flat sides with soft corners; raise the exponent for sharper corners.
-  let cx   = (u.viewMinX + u.viewMaxX) * 0.5;
-  let cy   = (u.viewMinY + u.viewMaxY) * 0.5;
-  let ax   = (u.viewMaxX - u.viewMinX) * 0.5 * (1.0 + ${CONTAIN_PAD});
-  let ay   = (u.viewMaxY - u.viewMinY) * 0.5 * (1.0 + ${CONTAIN_PAD});
-  let ex   = (me.pos.x - cx) / ax;
-  let ey   = (me.pos.y - cy) / ay;
-  let er   = pow(ex*ex*ex*ex + ey*ey*ey*ey, 0.25); // L4 distance; 1.0 = boundary
-  let edge = max(1.0 - er, 1e-4);
-  let bW   = dynMaxSpd * ${CONTAIN_STRENGTH};
-  let maxB = dynMaxSpd * 1.5;
-  let fMag = clamp(bW / (edge * edge), 0.0, maxB);
-  // Inward normal of the L4 superellipse: -(ex³, ey³) direction, scaled to data space.
-  let gx   = ex * ex * ex / ax;
-  let gy   = ey * ey * ey / ay;
-  let gLen = max(sqrt(gx*gx + gy*gy), 1e-8);
-  accel   -= vec2f(gx, gy) / gLen * fMag;
-
-  let curLen  = length(me.vel);
-  let curDir  = select(vec2f(1.0, 0.0), me.vel / curLen, curLen > 1e-12);
-  let desired = me.vel + accel;
-  let desLen  = length(desired);
-  let desDir  = select(curDir, desired / desLen, desLen > 1e-12);
-  let vel     = normalize(mix(curDir, desDir, ${TURN_RATE})) * dynMaxSpd;
-
-  boidsState[i] = BoidState(me.pos + vel, vel, me.species, 0u);
-}`;
-var BOIDS_RENDER_SHADER = `${UNIFORM_STRUCT}
-${BOID_STATE}
-struct BoidUniforms { radius: f32, _p0: u32, _p1: u32, _p2: u32 }
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> boidsState: array<BoidState>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(3) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(4) var<uniform> bu: BoidUniforms;
-struct VertexOutput { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) color: vec4f }
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
-  var out: VertexOutput;
-  out.uv = vec2f(0.0); out.color = vec4f(0.0); out.pos = vec4f(0.0, 0.0, 2.0, 1.0);
-  let boidIdx = vi / 6u;
-  if (boidIdx >= u.pointCount) { return out; }
-  let vtxInQuad = vi % 6u;
-  let b = boidsState[boidIdx];
-  let series = allSeries[seriesIdx.index];
-  let rx = u.viewMaxX - u.viewMinX;
-  let ry = u.viewMaxY - u.viewMinY;
-  if (rx < 1e-5 || ry < 1e-5) { return out; }
-  let normX = (b.pos.x - u.viewMinX) / rx;
-  let normY = (b.pos.y - u.viewMinY) / ry;
-  let clipX = normX * 2.0 - 1.0;
-  let clipY = normY * 2.0 - 1.0;
-  let zoomScale = clamp(pow(1.0 / min(max(rx, 1e-5), max(ry, 1e-5)), 0.5), 0.25, 12.0);
-  let r = max(3.0, bu.radius * zoomScale);
-  var corners = array<vec2f, 6>(
-    vec2f(-r,  r), vec2f( r,  r), vec2f(-r, -r),
-    vec2f(-r, -r), vec2f( r,  r), vec2f( r, -r)
-  );
-  let p = corners[vtxInQuad];
-  out.pos   = vec4f(clipX + p.x * 2.0 / u.width, clipY + p.y * 2.0 / u.height, 0.0, 1.0);
-  out.uv    = p;
-  out.color = series.color;
-  return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-  let rx = u.viewMaxX - u.viewMinX;
-  let ry = u.viewMaxY - u.viewMinY;
-  let zoomScale = clamp(pow(1.0 / min(max(rx, 1e-5), max(ry, 1e-5)), 0.5), 0.25, 12.0);
-  let r = max(3.0, bu.radius * zoomScale);
-  let d = length(in.uv);
-  if (d > r) { discard; }
-  let alpha    = 1.0 - smoothstep(r * 0.85, r, d);
-  // Soft ring: blend from the fill colour toward a darker shade of the same hue.
-  let ringT    = smoothstep(r * 0.60, r * 0.88, d);
-  let darkCol  = in.color.rgb * 0.40;
-  let col      = mix(in.color.rgb, darkCol, ringT * 0.55);
-  return vec4f(col, alpha);
-}
-`;
+var BOIDS_INIT_SHADER = `${UNIFORM_STRUCT}${BOID_STATE}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var<storage,read_write> boidsState: array<BoidState>;@group(0)@binding(4)var<uniform> seriesIdx: SeriesIndex;fn hash2(p: vec2f)-> vec2f{let q = vec2f(dot(p,vec2f(127.1,311.7)),dot(p,vec2f(269.5,183.3)));return fract(sin(q)* 43758.5453);}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let i = id.x;if(i >= u.pointCount){return;}let b = boidsState[i];if(b.vel.x == 0.0 && b.vel.y == 0.0){let seed = f32(seriesIdx.index * u.pointCount + i);let rPos = hash2(vec2f(seed * 0.1,1.7));let rVel = hash2(vec2f(seed * 0.1,0.5));let a = rVel.x * 6.28318;let spd = 0.002 + rVel.y * 0.003;boidsState[i] = BoidState(vec2f(rPos.x,rPos.y),vec2f(cos(a)* spd,sin(a)* spd),seriesIdx.index,0u);}}`;
+var BOIDS_CLEAR_SHADER = `${GRID_HELPERS}@group(0)@binding(0)var<storage,read_write> gridCount: array<atomic<u32>>;@compute @workgroup_size(${GRID_W * GRID_H})fn main(@builtin(global_invocation_id)id: vec3u){atomicStore(&gridCount[id.x],0u);}`;
+var BOIDS_INSERT_SHADER = `${UNIFORM_STRUCT}${BOID_STATE}${GRID_HELPERS}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> boidsState: array<BoidState>;@group(0)@binding(2)var<storage,read_write> gridCount: array<atomic<u32>>;@group(0)@binding(3)var<storage,read_write> gridBoids: array<u32>;@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let i = id.x;if(i >= u.pointCount){return;}let gp = gridParams(u.viewMinX,u.viewMaxX,u.viewMinY,u.viewMaxY);let gc = boidToCell(boidsState[i].pos,gp);let cell = u32(gc.y * i32(GRID_W)+ gc.x);let slot = atomicAdd(&gridCount[cell],1u);if(slot < MAX_PER_CELL){gridBoids[cell * MAX_PER_CELL + slot] = i;}}`;
+var BOIDS_SIM_SHADER = `${UNIFORM_STRUCT}${BOID_STATE}${GRID_HELPERS}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read_write> boidsState: array<BoidState>;@group(0)@binding(2)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(3)var<storage,read> gridCount: array<u32>;@group(0)@binding(4)var<storage,read> gridBoids: array<u32>;fn hash2(p: vec2f)-> vec2f{let q = vec2f(dot(p,vec2f(127.1,311.7)),dot(p,vec2f(269.5,183.3)));return fract(sin(q)* 43758.5453);}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let i = id.x;if(i >= u.pointCount){return;}let me = boidsState[i];let viewRange =(u.viewMaxX - u.viewMinX + u.viewMaxY - u.viewMinY)* 0.5;let dynMaxSpd = ${MAX_SPD}* max(viewRange,1.0);let gp = gridParams(u.viewMinX,u.viewMaxX,u.viewMinY,u.viewMaxY);let cellSize = min(gp.x,gp.y);let dynPer = cellSize * 2.0;let dynSep = dynPer * ${SEP_R / PERCEPTION};let perSq = dynPer * dynPer;let sepSq = dynSep * dynSep;var sep = vec2f(0.0);var align = vec2f(0.0);var coh = vec2f(0.0);var sameCnt = 0u;let lookahead = me.pos + me.vel;let gc = boidToCell(me.pos,gp);for(var dy = -${CLOSE_CELLS};dy <= ${CLOSE_CELLS};dy++){for(var dx = -${CLOSE_CELLS};dx <= ${CLOSE_CELLS};dx++){let nx = gc.x + dx;let ny = gc.y + dy;if(nx < 0 || nx >= i32(GRID_W)|| ny < 0 || ny >= i32(GRID_H)){continue;}let cell = u32(ny * i32(GRID_W)+ nx);let cnt = min(gridCount[cell],MAX_PER_CELL);let base = cell * MAX_PER_CELL;for(var s = 0u;s < cnt;s++){let j = gridBoids[base + s];if(j == i){continue;}let o = boidsState[j];let d = o.pos - lookahead;let dSq = dot(d,d);if(dSq < perSq && dSq > 1e-10){sameCnt += 1u;if(dSq < sepSq){sep -= d / dSq;}align += o.vel;coh += o.pos;}}}}var accel = vec2f(0.0);if(sameCnt > 0u){let fc = f32(sameCnt);let sepMag = length(sep);if(sepMag > 1e-9){accel +=(sep / sepMag)* dynMaxSpd * ${W_SEP};}let avgVel = align / fc;let avgSpd = length(avgVel);if(avgSpd > 1e-9){accel +=(avgVel / avgSpd * dynMaxSpd - me.vel)* ${W_ALIGN};}let toCenter = coh / fc - me.pos;let toCenterLen = length(toCenter);if(toCenterLen > 1e-9){accel +=(toCenter / toCenterLen * dynMaxSpd - me.vel)* ${W_COH};}}let n = hash2(me.pos * 150.0 + vec2f(f32(i)* 0.013,0.0));accel +=(n - 0.5)*(dynMaxSpd * ${W_NOISE});let cx =(u.viewMinX + u.viewMaxX)* 0.5;let cy =(u.viewMinY + u.viewMaxY)* 0.5;let ax =(u.viewMaxX - u.viewMinX)* 0.5 *(1.0 + ${CONTAIN_PAD});let ay =(u.viewMaxY - u.viewMinY)* 0.5 *(1.0 + ${CONTAIN_PAD});let ex =(me.pos.x - cx)/ ax;let ey =(me.pos.y - cy)/ ay;let er = pow(ex*ex*ex*ex + ey*ey*ey*ey,0.25);let edge = max(1.0 - er,1e-4);let bW = dynMaxSpd * ${CONTAIN_STRENGTH};let maxB = dynMaxSpd * 1.5;let fMag = clamp(bW /(edge * edge),0.0,maxB);let gx = ex * ex * ex / ax;let gy = ey * ey * ey / ay;let gLen = max(sqrt(gx*gx + gy*gy),1e-8);accel -= vec2f(gx,gy)/ gLen * fMag;let curLen = length(me.vel);let curDir = select(vec2f(1.0,0.0),me.vel / curLen,curLen > 1e-12);let desired = me.vel + accel;let desLen = length(desired);let desDir = select(curDir,desired / desLen,desLen > 1e-12);let vel = normalize(mix(curDir,desDir,${TURN_RATE}))* dynMaxSpd;boidsState[i] = BoidState(me.pos + vel,vel,me.species,0u);}`;
+var BOIDS_RENDER_SHADER = `${UNIFORM_STRUCT}${BOID_STATE}struct BoidUniforms{radius: f32,_p0: u32,_p1: u32,_p2: u32}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> boidsState: array<BoidState>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(3)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(4)var<uniform> bu: BoidUniforms;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)uv: vec2f,@location(1)color: vec4f}@vertex fn vs(@builtin(vertex_index)vi: u32)-> VertexOutput{var out: VertexOutput;out.uv = vec2f(0.0);out.color = vec4f(0.0);out.pos = vec4f(0.0,0.0,2.0,1.0);let boidIdx = vi / 6u;if(boidIdx >= u.pointCount){return out;}let vtxInQuad = vi % 6u;let b = boidsState[boidIdx];let series = allSeries[seriesIdx.index];let rx = u.viewMaxX - u.viewMinX;let ry = u.viewMaxY - u.viewMinY;if(rx < 1e-5 || ry < 1e-5){return out;}let normX =(b.pos.x - u.viewMinX)/ rx;let normY =(b.pos.y - u.viewMinY)/ ry;let clipX = normX * 2.0 - 1.0;let clipY = normY * 2.0 - 1.0;let zoomScale = clamp(pow(1.0 / min(max(rx,1e-5),max(ry,1e-5)),0.5),0.25,12.0);let r = max(3.0,bu.radius * zoomScale);var corners = array<vec2f,6>(vec2f(-r,r),vec2f(r,r),vec2f(-r,-r),vec2f(-r,-r),vec2f(r,r),vec2f(r,-r));let p = corners[vtxInQuad];out.pos = vec4f(clipX + p.x * 2.0 / u.width,clipY + p.y * 2.0 / u.height,0.0,1.0);out.uv = p;out.color = series.color;return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let rx = u.viewMaxX - u.viewMinX;let ry = u.viewMaxY - u.viewMinY;let zoomScale = clamp(pow(1.0 / min(max(rx,1e-5),max(ry,1e-5)),0.5),0.25,12.0);let r = max(3.0,bu.radius * zoomScale);let d = length(in.uv);if(d > r){discard;}let alpha = 1.0 - smoothstep(r * 0.85,r,d);let ringT = smoothstep(r * 0.60,r * 0.88,d);let darkCol = in.color.rgb * 0.40;let col = mix(in.color.rgb,darkCol,ringT * 0.55);return vec4f(col,alpha);}`;
 
 // src/charts/boids.ts
 var BOID_BYTES = 24;
@@ -3948,98 +2787,7 @@ var BoidsChart = {
   }
 };
 // src/shaders/experimental/step.ts
-var STEP_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct LineData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-struct StepUniforms {
-maxSamplesPerPixel: u32,
-stepMode: u32,
-_p2: u32,
-_p3: u32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> lineData: array<LineData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(3) var<uniform> su: StepUniforms;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) alpha: f32,
-@location(1) @interpolate(flat) seriesIdx: u32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
-let spanVerts = maxCols * 2u;
-if (vi < spanVerts) {
-let segIdx = vi / 2u;
-let endpoint = vi % 2u;
-let d = lineData[segIdx];
-let y = select(d.maxScreenY, d.minScreenY, endpoint == 0u);
-out.pos = vec4f(d.screenX * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, d.valid);
-out.alpha = d.valid;
-} else {
-let connOffset = vi - spanVerts;
-let connIdx = connOffset / 4u;
-let localVert = connOffset % 4u;
-let segInConn = localVert / 2u;
-let endpoint = localVert % 2u;
-if (connIdx + 1u >= maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.alpha = 0.0;
-return out;
-}
-let d0 = lineData[connIdx];
-let d1 = lineData[connIdx + 1u];
-let segValid = min(d0.valid, d1.valid);
-let midY0 = (d0.minScreenY + d0.maxScreenY) * 0.5;
-let midY1 = (d1.minScreenY + d1.maxScreenY) * 0.5;
-let midX = (d0.screenX + d1.screenX) * 0.5;
-var px: f32;
-var py: f32;
-if (su.stepMode == 0u) {
-if (segInConn == 0u) {
-px = select(d0.screenX, d1.screenX, endpoint == 1u);
-py = midY0;
-} else {
-px = d1.screenX;
-py = select(midY0, midY1, endpoint == 1u);
-}
-} else if (su.stepMode == 1u) {
-if (segInConn == 0u) {
-px = d0.screenX;
-py = select(midY0, midY1, endpoint == 1u);
-} else {
-px = select(d0.screenX, d1.screenX, endpoint == 1u);
-py = midY1;
-}
-} else {
-if (segInConn == 0u) {
-px = select(d0.screenX, midX, endpoint == 1u);
-py = midY0;
-} else {
-px = midX;
-py = select(midY0, midY1, endpoint == 1u);
-}
-}
-out.pos = vec4f(px * 2.0 - 1.0, 1.0 - py * 2.0, 0.0, segValid);
-out.alpha = segValid;
-}
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.alpha < 0.1) { discard; }
-let series = allSeries[in.seriesIdx];
-// Every series but the hovered one steps back toward the background while a highlight is
-// set; mixed into the colour rather than the alpha, since the line passes do not blend.
-let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
-return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
-}
-`;
+var STEP_RENDER_SHADER = `${UNIFORM_STRUCT}struct LineData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};struct StepUniforms{maxSamplesPerPixel: u32,stepMode: u32,_p2: u32,_p3: u32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> lineData: array<LineData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(3)var<uniform> su: StepUniforms;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)alpha: f32,@location(1)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;let maxCols = u32(u.width);let spanVerts = maxCols * 2u;if(vi < spanVerts){let segIdx = vi / 2u;let endpoint = vi % 2u;let d = lineData[segIdx];let y = select(d.maxScreenY,d.minScreenY,endpoint == 0u);out.pos = vec4f(d.screenX * 2.0 - 1.0,1.0 - y * 2.0,0.0,d.valid);out.alpha = d.valid;}else{let connOffset = vi - spanVerts;let connIdx = connOffset / 4u;let localVert = connOffset % 4u;let segInConn = localVert / 2u;let endpoint = localVert % 2u;if(connIdx + 1u >= maxCols){out.pos = vec4f(0.0,0.0,0.0,0.0);out.alpha = 0.0;return out;}let d0 = lineData[connIdx];let d1 = lineData[connIdx + 1u];let segValid = min(d0.valid,d1.valid);let midY0 =(d0.minScreenY + d0.maxScreenY)* 0.5;let midY1 =(d1.minScreenY + d1.maxScreenY)* 0.5;let midX =(d0.screenX + d1.screenX)* 0.5;var px: f32;var py: f32;if(su.stepMode == 0u){if(segInConn == 0u){px = select(d0.screenX,d1.screenX,endpoint == 1u);py = midY0;}else{px = d1.screenX;py = select(midY0,midY1,endpoint == 1u);}}else if(su.stepMode == 1u){if(segInConn == 0u){px = d0.screenX;py = select(midY0,midY1,endpoint == 1u);}else{px = select(d0.screenX,d1.screenX,endpoint == 1u);py = midY1;}}else{if(segInConn == 0u){px = select(d0.screenX,midX,endpoint == 1u);py = midY0;}else{px = midX;py = select(midY0,midY1,endpoint == 1u);}}out.pos = vec4f(px * 2.0 - 1.0,1.0 - py * 2.0,0.0,segValid);out.alpha = segValid;}return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.alpha < 0.1){discard;}let series = allSeries[in.seriesIdx];let dim = select(1.0,0.35,u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);return vec4f(mix(vec3f(u.bgR,u.bgG,u.bgB),series.color.rgb,dim),1.0);}`;
 
 // src/charts/experimental/step.ts
 var StepChart = {
@@ -4101,132 +2849,10 @@ maxValue: f32,
 _p0: f32,
 };
 `;
-var HIST_CLEAR_SHADER = `${UNIFORM_STRUCT}
-${HIST_UNIFORMS_STRUCT}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read_write> histBuffer: array<u32>;
-@group(0) @binding(2) var<uniform> hu: HistUniforms;
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let idx = id.x;
-if (idx < 4096u) {
-histBuffer[idx] = 0u;
-}
-}
-`;
-var HIST_COUNT_SHADER = `${UNIFORM_STRUCT}
-${HIST_UNIFORMS_STRUCT}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read_write> histBuffer: array<atomic<u32>>;
-@group(0) @binding(3) var<uniform> hu: HistUniforms;
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let idx = id.x;
-let count = u.pointCount;
-if (idx >= count) {
-return;
-}
-let x = dataX[idx];
-let useCustomRange = hu.minValue < hu.maxValue;
-let minVal = select(u.dataMinX, hu.minValue, useCustomRange);
-let maxVal = select(u.dataMaxX, hu.maxValue, useCustomRange);
-let range = maxVal - minVal;
-if (range <= 0.0) {
-return;
-}
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
-let binF = (x - minVal) / range * f32(binCount);
-let bin = u32(clamp(binF, 0.0, f32(binCount) - 1.0));
-if (bin < 4096u) {
-atomicAdd(&histBuffer[bin], 1u);
-}
-}
-`;
-var HIST_FIND_MAX_SHADER = `${UNIFORM_STRUCT}
-${HIST_UNIFORMS_STRUCT}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> histBuffer: array<u32>;
-@group(0) @binding(2) var<storage, read_write> maxBuffer: array<u32>;
-@group(0) @binding(3) var<uniform> hu: HistUniforms;
-@compute @workgroup_size(1)
-fn main() {
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
-let safeBins = min(binCount, 4096u);
-var maxVal = 0u;
-for (var i = 0u; i < safeBins; i++) {
-let v = histBuffer[i];
-if (v > maxVal) {
-maxVal = v;
-}
-}
-maxBuffer[0] = maxVal;
-}
-`;
-var HIST_RENDER_SHADER = `${UNIFORM_STRUCT}
-${HIST_UNIFORMS_STRUCT}
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> histBuffer: array<u32>;
-@group(0) @binding(2) var<storage, read> maxBuffer: array<u32>;
-@group(0) @binding(3) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(4) var<uniform> si: SeriesIndex;
-@group(0) @binding(5) var<uniform> hu: HistUniforms;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) alpha: f32,
-@location(1) @interpolate(flat) seriesIdx: u32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = si.index;
-let colIdx = vi / 6u;
-let vertexType = vi % 6u;
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
-let maxCount = maxBuffer[0];
-if (colIdx >= binCount || colIdx >= 4096u || maxCount == 0u) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.alpha = 0.0;
-return out;
-}
-let count = histBuffer[colIdx];
-if (count == 0u) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-out.alpha = 0.0;
-return out;
-}
-let useCustomRange = hu.minValue < hu.maxValue;
-let minVal = select(u.dataMinX, hu.minValue, useCustomRange);
-let maxVal = select(u.dataMaxX, hu.maxValue, useCustomRange);
-let range = maxVal - minVal;
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeX = select(viewRangeX, 1.0, viewRangeX < 0.0001);
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
-let binLeft = minVal + f32(colIdx) / f32(binCount) * range;
-let binRight = minVal + f32(colIdx + 1u) / f32(binCount) * range;
-let screenLeft = (binLeft - u.viewMinX) / safeRangeX;
-let screenRight = (binRight - u.viewMinX) / safeRangeX;
-let screenBottom = 1.0 - (0.0 - u.viewMinY) / safeRangeY;
-let screenTop = 1.0 - (f32(count) - u.viewMinY) / safeRangeY;
-var positions = array<vec2f, 6>(
-vec2f(screenLeft, screenBottom),
-vec2f(screenRight, screenBottom),
-vec2f(screenLeft, screenTop),
-vec2f(screenLeft, screenTop),
-vec2f(screenRight, screenBottom),
-vec2f(screenRight, screenTop)
-);
-let screenPos = positions[vertexType];
-out.pos = vec4f(screenPos.x * 2.0 - 1.0, 1.0 - screenPos.y * 2.0, 0.0, 1.0);
-out.alpha = 1.0;
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.alpha < 0.1) { discard; }
-let series = allSeries[in.seriesIdx];
-return vec4f(series.color.rgb, 0.85);
-}
-`;
+var HIST_CLEAR_SHADER = `${UNIFORM_STRUCT}${HIST_UNIFORMS_STRUCT}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read_write> histBuffer: array<u32>;@group(0)@binding(2)var<uniform> hu: HistUniforms;@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let idx = id.x;if(idx < 4096u){histBuffer[idx] = 0u;}}`;
+var HIST_COUNT_SHADER = `${UNIFORM_STRUCT}${HIST_UNIFORMS_STRUCT}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read_write> histBuffer: array<atomic<u32>>;@group(0)@binding(3)var<uniform> hu: HistUniforms;@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let idx = id.x;let count = u.pointCount;if(idx >= count){return;}let x = dataX[idx];let useCustomRange = hu.minValue < hu.maxValue;let minVal = select(u.dataMinX,hu.minValue,useCustomRange);let maxVal = select(u.dataMaxX,hu.maxValue,useCustomRange);let range = maxVal - minVal;if(range <= 0.0){return;}let binCount = select(u32(u.width),hu.binCount,hu.binCount > 0u);let binF =(x - minVal)/ range * f32(binCount);let bin = u32(clamp(binF,0.0,f32(binCount)- 1.0));if(bin < 4096u){atomicAdd(&histBuffer[bin],1u);}}`;
+var HIST_FIND_MAX_SHADER = `${UNIFORM_STRUCT}${HIST_UNIFORMS_STRUCT}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> histBuffer: array<u32>;@group(0)@binding(2)var<storage,read_write> maxBuffer: array<u32>;@group(0)@binding(3)var<uniform> hu: HistUniforms;@compute @workgroup_size(1)fn main(){let binCount = select(u32(u.width),hu.binCount,hu.binCount > 0u);let safeBins = min(binCount,4096u);var maxVal = 0u;for(var i = 0u;i < safeBins;i++){let v = histBuffer[i];if(v > maxVal){maxVal = v;}}maxBuffer[0] = maxVal;}`;
+var HIST_RENDER_SHADER = `${UNIFORM_STRUCT}${HIST_UNIFORMS_STRUCT}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> histBuffer: array<u32>;@group(0)@binding(2)var<storage,read> maxBuffer: array<u32>;@group(0)@binding(3)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(4)var<uniform> si: SeriesIndex;@group(0)@binding(5)var<uniform> hu: HistUniforms;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)alpha: f32,@location(1)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = si.index;let colIdx = vi / 6u;let vertexType = vi % 6u;let binCount = select(u32(u.width),hu.binCount,hu.binCount > 0u);let maxCount = maxBuffer[0];if(colIdx >= binCount || colIdx >= 4096u || maxCount == 0u){out.pos = vec4f(0.0,0.0,0.0,0.0);out.alpha = 0.0;return out;}let count = histBuffer[colIdx];if(count == 0u){out.pos = vec4f(0.0,0.0,0.0,0.0);out.alpha = 0.0;return out;}let useCustomRange = hu.minValue < hu.maxValue;let minVal = select(u.dataMinX,hu.minValue,useCustomRange);let maxVal = select(u.dataMaxX,hu.maxValue,useCustomRange);let range = maxVal - minVal;let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;let safeRangeX = select(viewRangeX,1.0,viewRangeX < 0.0001);let safeRangeY = select(viewRangeY,1.0,viewRangeY < 0.0001);let binLeft = minVal + f32(colIdx)/ f32(binCount)* range;let binRight = minVal + f32(colIdx + 1u)/ f32(binCount)* range;let screenLeft =(binLeft - u.viewMinX)/ safeRangeX;let screenRight =(binRight - u.viewMinX)/ safeRangeX;let screenBottom = 1.0 -(0.0 - u.viewMinY)/ safeRangeY;let screenTop = 1.0 -(f32(count)- u.viewMinY)/ safeRangeY;var positions = array<vec2f,6>(vec2f(screenLeft,screenBottom),vec2f(screenRight,screenBottom),vec2f(screenLeft,screenTop),vec2f(screenLeft,screenTop),vec2f(screenRight,screenBottom),vec2f(screenRight,screenTop));let screenPos = positions[vertexType];out.pos = vec4f(screenPos.x * 2.0 - 1.0,1.0 - screenPos.y * 2.0,0.0,1.0);out.alpha = 1.0;return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.alpha < 0.1){discard;}let series = allSeries[in.seriesIdx];return vec4f(series.color.rgb,0.85);}`;
 
 // src/charts/experimental/histogram.ts
 var HistogramChart = {
@@ -4346,93 +2972,7 @@ var HistogramChart = {
   }
 };
 // src/shaders/experimental/heatmap.ts
-var HEATMAP_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct HeatmapUniforms {
-  dispatchXCount: u32,
-  gridColumns: u32,
-  gridRows: u32,
-  colorScale: u32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var outputTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform> hu: HeatmapUniforms;
-@group(0) @binding(7) var<storage, read> dataValue: array<f32>;
-fn viridis(t: f32) -> vec3f {
-  let c0 = vec3f(0.267, 0.005, 0.329);
-  let c1 = vec3f(0.229, 0.322, 0.545);
-  let c2 = vec3f(0.128, 0.566, 0.551);
-  let c3 = vec3f(0.370, 0.789, 0.383);
-  let c4 = vec3f(0.993, 0.906, 0.144);
-  let s = clamp(t, 0.0, 1.0) * 4.0;
-  let i = u32(s);
-  let f = s - f32(i);
-  if (i == 0u) { return mix(c0, c1, f); }
-  if (i == 1u) { return mix(c1, c2, f); }
-  if (i == 2u) { return mix(c2, c3, f); }
-  return mix(c3, c4, clamp(f, 0.0, 1.0));
-}
-fn plasma(t: f32) -> vec3f {
-  let c0 = vec3f(0.050, 0.030, 0.528);
-  let c1 = vec3f(0.558, 0.003, 0.667);
-  let c2 = vec3f(0.879, 0.176, 0.334);
-  let c3 = vec3f(0.980, 0.534, 0.125);
-  let c4 = vec3f(0.940, 0.975, 0.131);
-  let s = clamp(t, 0.0, 1.0) * 4.0;
-  let i = u32(s);
-  let f = s - f32(i);
-  if (i == 0u) { return mix(c0, c1, f); }
-  if (i == 1u) { return mix(c1, c2, f); }
-  if (i == 2u) { return mix(c2, c3, f); }
-  return mix(c3, c4, clamp(f, 0.0, 1.0));
-}
-fn applyColorScale(t: f32, scale: u32) -> vec3f {
-  let tc = clamp(t, 0.0, 1.0);
-  if (scale == 1u) { return plasma(tc); }
-  if (scale == 2u) { return mix(vec3f(0.0, 1.0, 1.0), vec3f(1.0, 0.0, 1.0), tc); }
-  if (scale == 3u) { return mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), tc); }
-  return viridis(tc);
-}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let series = allSeries[seriesIdx.index];
-  let visStart = series.visibleRange.x;
-  let visCount = series.visibleRange.y;
-  let localIdx = id.y * hu.dispatchXCount + id.x;
-  if (localIdx >= visCount) { return; }
-  let idx = visStart + localIdx;
-  if (idx >= u.pointCount) { return; }
-  let col = dataX[idx];
-  let row = dataY[idx];
-  let t = dataValue[idx];
-  let rangeX = u.viewMaxX - u.viewMinX;
-  let rangeY = u.viewMaxY - u.viewMinY;
-  if (rangeX < 0.0001 || rangeY < 0.0001) { return; }
-  let normX = (col - u.viewMinX) / rangeX;
-  let normY = (row - u.viewMinY) / rangeY;
-  let centerX = normX * u.width;
-  let centerY = (1.0 - normY) * u.height;
-  let cellHalfW = 0.5 * u.width / rangeX;
-  let cellHalfH = 0.5 * u.height / rangeY;
-  let iWidth = i32(u.width);
-  let iHeight = i32(u.height);
-  let x0 = max(0, i32(centerX - cellHalfW));
-  let x1 = min(iWidth - 1, i32(centerX + cellHalfW));
-  let y0 = max(0, i32(centerY - cellHalfH));
-  let y1 = min(iHeight - 1, i32(centerY + cellHalfH));
-  if (x0 > x1 || y0 > y1) { return; }
-  let rgb = applyColorScale(t, hu.colorScale);
-  let color = vec4f(rgb, 1.0);
-  for (var py = y0; py <= y1; py++) {
-    for (var px = x0; px <= x1; px++) {
-      textureStore(outputTex, vec2i(px, py), color);
-    }
-  }
-}
-`;
+var HEATMAP_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct HeatmapUniforms{dispatchXCount: u32,gridColumns: u32,gridRows: u32,colorScale: u32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var outputTex: texture_storage_2d<rgba8unorm,write>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(6)var<uniform> hu: HeatmapUniforms;@group(0)@binding(7)var<storage,read> dataValue: array<f32>;fn viridis(t: f32)-> vec3f{let c0 = vec3f(0.267,0.005,0.329);let c1 = vec3f(0.229,0.322,0.545);let c2 = vec3f(0.128,0.566,0.551);let c3 = vec3f(0.370,0.789,0.383);let c4 = vec3f(0.993,0.906,0.144);let s = clamp(t,0.0,1.0)* 4.0;let i = u32(s);let f = s - f32(i);if(i == 0u){return mix(c0,c1,f);}if(i == 1u){return mix(c1,c2,f);}if(i == 2u){return mix(c2,c3,f);}return mix(c3,c4,clamp(f,0.0,1.0));}fn plasma(t: f32)-> vec3f{let c0 = vec3f(0.050,0.030,0.528);let c1 = vec3f(0.558,0.003,0.667);let c2 = vec3f(0.879,0.176,0.334);let c3 = vec3f(0.980,0.534,0.125);let c4 = vec3f(0.940,0.975,0.131);let s = clamp(t,0.0,1.0)* 4.0;let i = u32(s);let f = s - f32(i);if(i == 0u){return mix(c0,c1,f);}if(i == 1u){return mix(c1,c2,f);}if(i == 2u){return mix(c2,c3,f);}return mix(c3,c4,clamp(f,0.0,1.0));}fn applyColorScale(t: f32,scale: u32)-> vec3f{let tc = clamp(t,0.0,1.0);if(scale == 1u){return plasma(tc);}if(scale == 2u){return mix(vec3f(0.0,1.0,1.0),vec3f(1.0,0.0,1.0),tc);}if(scale == 3u){return mix(vec3f(1.0,1.0,0.0),vec3f(1.0,0.0,0.0),tc);}return viridis(tc);}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let series = allSeries[seriesIdx.index];let visStart = series.visibleRange.x;let visCount = series.visibleRange.y;let localIdx = id.y * hu.dispatchXCount + id.x;if(localIdx >= visCount){return;}let idx = visStart + localIdx;if(idx >= u.pointCount){return;}let col = dataX[idx];let row = dataY[idx];let t = dataValue[idx];let rangeX = u.viewMaxX - u.viewMinX;let rangeY = u.viewMaxY - u.viewMinY;if(rangeX < 0.0001 || rangeY < 0.0001){return;}let normX =(col - u.viewMinX)/ rangeX;let normY =(row - u.viewMinY)/ rangeY;let centerX = normX * u.width;let centerY =(1.0 - normY)* u.height;let cellHalfW = 0.5 * u.width / rangeX;let cellHalfH = 0.5 * u.height / rangeY;let iWidth = i32(u.width);let iHeight = i32(u.height);let x0 = max(0,i32(centerX - cellHalfW));let x1 = min(iWidth - 1,i32(centerX + cellHalfW));let y0 = max(0,i32(centerY - cellHalfH));let y1 = min(iHeight - 1,i32(centerY + cellHalfH));if(x0 > x1 || y0 > y1){return;}let rgb = applyColorScale(t,hu.colorScale);let color = vec4f(rgb,1.0);for(var py = y0;py <= y1;py++){for(var px = x0;px <= x1;px++){textureStore(outputTex,vec2i(px,py),color);}}}`;
 
 // src/charts/experimental/heatmap.ts
 var MAX_WG_DIM2 = 65535;
@@ -4492,70 +3032,7 @@ var HeatmapChart = {
   }
 };
 // src/shaders/experimental/bubble.ts
-var BUBBLE_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct BubbleUniforms {
-  dispatchXCount: u32,
-  maxPointSize: f32,
-  minPointSize: f32,
-  _pad: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var outputTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform> bu: BubbleUniforms;
-@group(0) @binding(7) var<storage, read> dataR: array<f32>;
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let series = allSeries[seriesIdx.index];
-  let visStart = series.visibleRange.x;
-  let visCount = series.visibleRange.y;
-  let localIdx = id.y * bu.dispatchXCount + id.x;
-  if (localIdx >= visCount) { return; }
-  let idx = visStart + localIdx;
-  if (idx >= u.pointCount) { return; }
-  let x = dataX[idx];
-  let y = dataY[idx];
-  let r = dataR[idx];
-  if (r <= 0.0) { return; }
-  let width = u32(u.width);
-  let height = u32(u.height);
-  let rangeX = u.viewMaxX - u.viewMinX;
-  let rangeY = u.viewMaxY - u.viewMinY;
-  if (rangeX < 0.0001 || rangeY < 0.0001) { return; }
-  let normX = (x - u.viewMinX) / rangeX;
-  let normY = (y - u.viewMinY) / rangeY;
-  let pixelX = i32(normX * f32(width));
-  let pixelY = i32((1.0 - normY) * f32(height));
-  let minDim = min(u.width, u.height);
-  let maxRange = max(rangeX, rangeY);
-  let rawRadius = r * minDim / maxRange;
-  let radius = i32(clamp(rawRadius, bu.minPointSize, bu.maxPointSize));
-  let iWidth = i32(width);
-  let iHeight = i32(height);
-  let borderR: f32 = max(1.0, f32(radius) * 0.08);
-  let innerR = f32(radius) - borderR;
-  for (var dy = -radius; dy <= radius; dy++) {
-    for (var dx = -radius; dx <= radius; dx++) {
-      let dist2 = f32(dx * dx + dy * dy);
-      if (dist2 > f32(radius * radius)) { continue; }
-      let px = pixelX + dx;
-      let py = pixelY + dy;
-      if (px >= 0 && px < iWidth && py >= 0 && py < iHeight) {
-        var fillColor: vec4f;
-        if (dist2 > innerR * innerR) {
-          fillColor = vec4f(series.color.rgb * 0.5, 0.95);
-        } else {
-          fillColor = vec4f(series.color.rgb, 0.65);
-        }
-        textureStore(outputTex, vec2i(px, py), fillColor);
-      }
-    }
-  }
-}
-`;
+var BUBBLE_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct BubbleUniforms{dispatchXCount: u32,maxPointSize: f32,minPointSize: f32,_pad: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var outputTex: texture_storage_2d<rgba8unorm,write>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> seriesIdx: SeriesIndex;@group(0)@binding(6)var<uniform> bu: BubbleUniforms;@group(0)@binding(7)var<storage,read> dataR: array<f32>;@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let series = allSeries[seriesIdx.index];let visStart = series.visibleRange.x;let visCount = series.visibleRange.y;let localIdx = id.y * bu.dispatchXCount + id.x;if(localIdx >= visCount){return;}let idx = visStart + localIdx;if(idx >= u.pointCount){return;}let x = dataX[idx];let y = dataY[idx];let r = dataR[idx];if(r <= 0.0){return;}let width = u32(u.width);let height = u32(u.height);let rangeX = u.viewMaxX - u.viewMinX;let rangeY = u.viewMaxY - u.viewMinY;if(rangeX < 0.0001 || rangeY < 0.0001){return;}let normX =(x - u.viewMinX)/ rangeX;let normY =(y - u.viewMinY)/ rangeY;let pixelX = i32(normX * f32(width));let pixelY = i32((1.0 - normY)* f32(height));let minDim = min(u.width,u.height);let maxRange = max(rangeX,rangeY);let rawRadius = r * minDim / maxRange;let radius = i32(clamp(rawRadius,bu.minPointSize,bu.maxPointSize));let iWidth = i32(width);let iHeight = i32(height);let borderR: f32 = max(1.0,f32(radius)* 0.08);let innerR = f32(radius)- borderR;for(var dy = -radius;dy <= radius;dy++){for(var dx = -radius;dx <= radius;dx++){let dist2 = f32(dx * dx + dy * dy);if(dist2 > f32(radius * radius)){continue;}let px = pixelX + dx;let py = pixelY + dy;if(px >= 0 && px < iWidth && py >= 0 && py < iHeight){var fillColor: vec4f;if(dist2 > innerR * innerR){fillColor = vec4f(series.color.rgb * 0.5,0.95);}else{fillColor = vec4f(series.color.rgb,0.65);}textureStore(outputTex,vec2i(px,py),fillColor);}}}}`;
 
 // src/charts/experimental/bubble.ts
 var MAX_WG_DIM3 = 65535;
@@ -4594,76 +3071,7 @@ var BubbleChart = {
   ]
 };
 // src/shaders/experimental/baseline-area.ts
-var BASELINE_AREA_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct LineData {
-screenX: f32,
-minScreenY: f32,
-maxScreenY: f32,
-valid: f32,
-};
-struct BaselineAreaUniforms {
-maxSamplesPerPixel: u32,
-baseline: f32,
-positiveColor: u32,
-negativeColor: u32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> lineData: array<LineData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(3) var<uniform> bau: BaselineAreaUniforms;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) seriesIdx: u32,
-@location(1) @interpolate(flat) valid: f32,
-@location(2) lineNormY: f32,
-@location(3) baselineNormY: f32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.valid = 0.0;
-out.lineNormY = 0.0;
-out.baselineNormY = 0.0;
-let maxCols = u32(u.width);
-if (vi >= maxCols * 2u) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let col = vi / 2u;
-let onLine = (vi % 2u) == 0u;
-let d = lineData[col];
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let normBaseline = select(0.0, (bau.baseline - u.viewMinY) / viewRangeY, viewRangeY > 0.0001);
-let baselineScreenY = 1.0 - normBaseline;
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let leftBound = select(0.0, clamp((u.dataMinX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-let rightBound = select(1.0, clamp((u.dataMaxX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-var sx = clamp(d.screenX, leftBound, rightBound);
-let midScreenY = (d.minScreenY + d.maxScreenY) * 0.5;
-let lineNormY = 1.0 - midScreenY;
-var py = select(baselineScreenY, midScreenY, onLine);
-if (d.valid < 0.5 && vi > 0u) {
-let prevCol = (vi - 1u) / 2u;
-let pd = lineData[prevCol];
-sx = clamp(pd.screenX, leftBound, rightBound);
-let prevMidScreenY = (pd.minScreenY + pd.maxScreenY) * 0.5;
-py = select(baselineScreenY, prevMidScreenY, (vi - 1u) % 2u == 0u);
-}
-let clipX = sx * 2.0 - 1.0;
-let clipY = 1.0 - py * 2.0;
-out.valid = d.valid;
-out.lineNormY = lineNormY;
-out.baselineNormY = normBaseline;
-out.pos = vec4f(clipX, clipY, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.valid < 0.5) { discard; }
-let packedColor = select(bau.negativeColor, bau.positiveColor, in.lineNormY > in.baselineNormY);
-let color = unpack4x8unorm(packedColor);
-return vec4f(color.rgb, 0.8);
-}
-`;
+var BASELINE_AREA_RENDER_SHADER = `${UNIFORM_STRUCT}struct LineData{screenX: f32,minScreenY: f32,maxScreenY: f32,valid: f32,};struct BaselineAreaUniforms{maxSamplesPerPixel: u32,baseline: f32,positiveColor: u32,negativeColor: u32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> lineData: array<LineData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(3)var<uniform> bau: BaselineAreaUniforms;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)seriesIdx: u32,@location(1)@interpolate(flat)valid: f32,@location(2)lineNormY: f32,@location(3)baselineNormY: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.valid = 0.0;out.lineNormY = 0.0;out.baselineNormY = 0.0;let maxCols = u32(u.width);if(vi >= maxCols * 2u){out.pos = vec4f(0.0,0.0,0.0,0.0);return out;}let col = vi / 2u;let onLine =(vi % 2u)== 0u;let d = lineData[col];let viewRangeY = u.viewMaxY - u.viewMinY;let normBaseline = select(0.0,(bau.baseline - u.viewMinY)/ viewRangeY,viewRangeY > 0.0001);let baselineScreenY = 1.0 - normBaseline;let viewRangeX = u.viewMaxX - u.viewMinX;let leftBound = select(0.0,clamp((u.dataMinX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);let rightBound = select(1.0,clamp((u.dataMaxX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);var sx = clamp(d.screenX,leftBound,rightBound);let midScreenY =(d.minScreenY + d.maxScreenY)* 0.5;let lineNormY = 1.0 - midScreenY;var py = select(baselineScreenY,midScreenY,onLine);if(d.valid < 0.5 && vi > 0u){let prevCol =(vi - 1u)/ 2u;let pd = lineData[prevCol];sx = clamp(pd.screenX,leftBound,rightBound);let prevMidScreenY =(pd.minScreenY + pd.maxScreenY)* 0.5;py = select(baselineScreenY,prevMidScreenY,(vi - 1u)% 2u == 0u);}let clipX = sx * 2.0 - 1.0;let clipY = 1.0 - py * 2.0;out.valid = d.valid;out.lineNormY = lineNormY;out.baselineNormY = normBaseline;out.pos = vec4f(clipX,clipY,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.valid < 0.5){discard;}let packedColor = select(bau.negativeColor,bau.positiveColor,in.lineNormY > in.baselineNormY);let color = unpack4x8unorm(packedColor);return vec4f(color.rgb,0.8);}`;
 
 // src/charts/experimental/baseline-area.ts
 var packRGB2 = (r, g, b) => (Math.round(r * 255) & 255 | (Math.round(g * 255) & 255) << 8 | (Math.round(b * 255) & 255) << 16 | 255 << 24) >>> 0;
@@ -4721,271 +3129,9 @@ var BaselineAreaChart = {
   ]
 };
 // src/shaders/experimental/error-band.ts
-var ERROR_BAND_COMPUTE_SHADER = `${UNIFORM_STRUCT}
-struct ErrorBandUniforms {
-maxSamplesPerPixel: u32,
-bandOpacity: f32,
-_p0: u32, _p1: u32,
-};
-struct BandData {
-screenX: f32,
-loScreenY: f32,
-hiScreenY: f32,
-centerScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> dataX: array<f32>;
-@group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var<storage, read_write> bandData: array<BandData>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> eu: ErrorBandUniforms;
-@group(0) @binding(6) var<storage, read> loData: array<f32>;
-@group(0) @binding(7) var<storage, read> hiData: array<f32>;
-${BINARY_SEARCH}
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-}
-return;
-}
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-return;
-}
-let relPx = f32(outputIdx);
-let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
-let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-return;
-}
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
-let centerX = (pixelMinX + pixelMaxX) * 0.5;
-if (startIdx >= endIdx) {
-var bestIdx = startIdx;
-if (startIdx > 0u && startIdx < count) {
-let distPrev = abs(dataX[startIdx - 1u] - centerX);
-let distCurr = abs(dataX[startIdx] - centerX);
-if (distPrev < distCurr) {
-bestIdx = startIdx - 1u;
-}
-} else if (startIdx >= count && count > 0u) {
-bestIdx = count - 1u;
-}
-// The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
-// edge is drawn even when the half nearer to that neighbour lies entirely off screen.
-if (outputIdx == 0u && startIdx > 0u) {
-bestIdx = startIdx - 1u;
-}
-if (outputIdx + 1u == maxCols && startIdx < count) {
-bestIdx = startIdx;
-}
-if (bestIdx >= count) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-return;
-}
-let y = dataY[bestIdx];
-if (y < -1.0e38) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-return;
-}
-var lo = loData[bestIdx];
-var hi = hiData[bestIdx];
-if (lo < -1.0e38) { lo = y; }
-if (hi < -1.0e38) { hi = y; }
-let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
-let normY = (y - u.viewMinY) / viewRangeY;
-let normLo = (lo - u.viewMinY) / viewRangeY;
-let normHi = (hi - u.viewMinY) / viewRangeY;
-bandData[outputIdx] = BandData(normX, 1.0 - normLo, 1.0 - normHi, 1.0 - normY, 1.0);
-return;
-}
-var dataMinY = 3.0e38;
-var dataMaxY = -3.0e38;
-var dataMinLo = 3.0e38;
-var dataMaxHi = -3.0e38;
-let rangeCount = endIdx - startIdx;
-let maxSamples = eu.maxSamplesPerPixel;
-if (maxSamples > 1u && rangeCount > maxSamples) {
-let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
-for (var s = 0u; s < maxSamples; s++) {
-let idx = startIdx + u32(f32(s) * stride);
-if (idx < endIdx) {
-let y = dataY[idx];
-if (y > -1.0e38) {
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-let lo = loData[idx];
-let hi = hiData[idx];
-if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
-if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
-}
-}
-}
-let lastY = dataY[endIdx - 1u];
-if (lastY > -1.0e38) {
-dataMinY = min(dataMinY, lastY);
-dataMaxY = max(dataMaxY, lastY);
-let lastLo = loData[endIdx - 1u];
-let lastHi = hiData[endIdx - 1u];
-if (lastLo > -1.0e38) { dataMinLo = min(dataMinLo, lastLo); }
-if (lastHi > -1.0e38) { dataMaxHi = max(dataMaxHi, lastHi); }
-}
-} else {
-for (var i = startIdx; i < endIdx; i++) {
-let y = dataY[i];
-if (y > -1.0e38) {
-dataMinY = min(dataMinY, y);
-dataMaxY = max(dataMaxY, y);
-let lo = loData[i];
-let hi = hiData[i];
-if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
-if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
-}
-}
-}
-if (dataMaxY < dataMinY) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-return;
-}
-if (dataMaxHi < dataMinLo) {
-dataMinLo = dataMinY;
-dataMaxHi = dataMaxY;
-}
-// The vertex of a column that holds samples sits at the middle of those samples, not at the
-// pixel centre: the empty columns on either side collapse onto their nearest sample, so a
-// vertex left or right of that sample folds the strip back over itself and the overlap
-// shows as a darker seam wherever the fill is blended.
-let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
-let normMinLo = (dataMinLo - u.viewMinY) / viewRangeY;
-let normMaxHi = (dataMaxHi - u.viewMinY) / viewRangeY;
-let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
-let normMaxY = (dataMaxY - u.viewMinY) / viewRangeY;
-let loScreenY = 1.0 - normMinLo;
-let hiScreenY = 1.0 - normMaxHi;
-let centerScreenY = 1.0 - (normMinY + normMaxY) * 0.5;
-bandData[outputIdx] = BandData(normX, loScreenY, hiScreenY, centerScreenY, 1.0);
-}
-`;
-var ERROR_BAND_FILL_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct ErrorBandUniforms {
-maxSamplesPerPixel: u32,
-bandOpacity: f32,
-_p0: u32, _p1: u32,
-};
-struct BandData {
-screenX: f32,
-loScreenY: f32,
-hiScreenY: f32,
-centerScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> bandData: array<BandData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(3) var<uniform> eu: ErrorBandUniforms;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) seriesIdx: u32,
-@location(1) @interpolate(flat) valid: f32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.valid = 0.0;
-let maxCols = u32(u.width);
-if (vi >= maxCols * 2u) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let col = vi / 2u;
-let onHi = (vi % 2u) == 0u;
-let d = bandData[col];
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let leftBound = select(0.0, clamp((u.dataMinX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-let rightBound = select(1.0, clamp((u.dataMaxX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-var sx = clamp(d.screenX, leftBound, rightBound);
-var py = select(d.loScreenY, d.hiScreenY, onHi);
-if (d.valid < 0.5 && vi > 0u) {
-let prevCol = (vi - 1u) / 2u;
-let pd = bandData[prevCol];
-sx = clamp(pd.screenX, leftBound, rightBound);
-py = select(pd.loScreenY, pd.hiScreenY, (vi - 1u) % 2u == 0u);
-}
-let clipX = sx * 2.0 - 1.0;
-let clipY = 1.0 - py * 2.0;
-out.valid = d.valid;
-out.pos = vec4f(clipX, clipY, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.valid < 0.5) { discard; }
-let series = allSeries[in.seriesIdx];
-// The band of every series but the hovered one fades like its line: colour pulled toward the
-// background as well as the opacity lowered, so stacked translucent bands still recede.
-let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
-return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), eu.bandOpacity * dim);
-}
-`;
-var ERROR_BAND_LINE_RENDER_SHADER = `${UNIFORM_STRUCT}
-struct BandData {
-screenX: f32,
-loScreenY: f32,
-hiScreenY: f32,
-centerScreenY: f32,
-valid: f32,
-};
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> bandData: array<BandData>;
-@group(0) @binding(2) var<storage, read> allSeries: array<SeriesInfo>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) alpha: f32,
-@location(1) @interpolate(flat) seriesIdx: u32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
-var out: VertexOutput;
-out.seriesIdx = series_idx;
-out.alpha = 0.0;
-let maxCols = u32(u.width);
-let segIdx = vi / 2u;
-let endpoint = vi % 2u;
-if (segIdx + 1u > maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let col = segIdx + endpoint;
-if (col >= maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let d = bandData[col];
-let d0 = bandData[segIdx];
-let d1 = bandData[segIdx + 1u];
-let segValid = min(d0.valid, d1.valid);
-out.pos = vec4f(d.screenX * 2.0 - 1.0, 1.0 - d.centerScreenY * 2.0, 0.0, segValid);
-out.alpha = segValid;
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-if (in.alpha < 0.1) { discard; }
-let series = allSeries[in.seriesIdx];
-// Every series but the hovered one steps back toward the background while a highlight is
-// set; mixed into the colour rather than the alpha, since the line passes do not blend.
-let dim = select(1.0, 0.35, u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);
-return vec4f(mix(vec3f(u.bgR, u.bgG, u.bgB), series.color.rgb, dim), 1.0);
-}
-`;
+var ERROR_BAND_COMPUTE_SHADER = `${UNIFORM_STRUCT}struct ErrorBandUniforms{maxSamplesPerPixel: u32,bandOpacity: f32,_p0: u32,_p1: u32,};struct BandData{screenX: f32,loScreenY: f32,hiScreenY: f32,centerScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var<storage,read_write> bandData: array<BandData>;@group(0)@binding(4)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(5)var<uniform> eu: ErrorBandUniforms;@group(0)@binding(6)var<storage,read> loData: array<f32>;@group(0)@binding(7)var<storage,read> hiData: array<f32>;${BINARY_SEARCH}@compute @workgroup_size(${COMPUTE_WG})fn main(@builtin(global_invocation_id)id: vec3u){let outputIdx = id.x;let maxCols = u32(u.width);let count = u.pointCount;if(outputIdx >= maxCols || count == 0u){if(outputIdx < maxCols){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);}return;}let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;if(viewRangeX < 0.0001 || viewRangeY < 0.0001){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);return;}let relPx = f32(outputIdx);let pixelMinX = u.viewMinX +(relPx / u.width)* viewRangeX;let pixelMaxX = u.viewMinX +((relPx + 1.0)/ u.width)* viewRangeX;if(pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);return;}let startIdx = lowerBound(pixelMinX,count);var endIdx = lowerBound(pixelMaxX,count);endIdx = min(endIdx,count);let centerX =(pixelMinX + pixelMaxX)* 0.5;if(startIdx >= endIdx){var bestIdx = startIdx;if(startIdx > 0u && startIdx < count){let distPrev = abs(dataX[startIdx - 1u] - centerX);let distCurr = abs(dataX[startIdx] - centerX);if(distPrev < distCurr){bestIdx = startIdx - 1u;}}else if(startIdx >= count && count > 0u){bestIdx = count - 1u;}if(outputIdx == 0u && startIdx > 0u){bestIdx = startIdx - 1u;}if(outputIdx + 1u == maxCols && startIdx < count){bestIdx = startIdx;}if(bestIdx >= count){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);return;}let y = dataY[bestIdx];if(y < -1.0e38){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);return;}var lo = loData[bestIdx];var hi = hiData[bestIdx];if(lo < -1.0e38){lo = y;}if(hi < -1.0e38){hi = y;}let normX =(dataX[bestIdx] - u.viewMinX)/ viewRangeX;let normY =(y - u.viewMinY)/ viewRangeY;let normLo =(lo - u.viewMinY)/ viewRangeY;let normHi =(hi - u.viewMinY)/ viewRangeY;bandData[outputIdx] = BandData(normX,1.0 - normLo,1.0 - normHi,1.0 - normY,1.0);return;}var dataMinY = 3.0e38;var dataMaxY = -3.0e38;var dataMinLo = 3.0e38;var dataMaxHi = -3.0e38;let rangeCount = endIdx - startIdx;let maxSamples = eu.maxSamplesPerPixel;if(maxSamples > 1u && rangeCount > maxSamples){let stride = f32(rangeCount - 1u)/ f32(maxSamples - 1u);for(var s = 0u;s < maxSamples;s++){let idx = startIdx + u32(f32(s)* stride);if(idx < endIdx){let y = dataY[idx];if(y > -1.0e38){dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);let lo = loData[idx];let hi = hiData[idx];if(lo > -1.0e38){dataMinLo = min(dataMinLo,lo);}if(hi > -1.0e38){dataMaxHi = max(dataMaxHi,hi);}}}}let lastY = dataY[endIdx - 1u];if(lastY > -1.0e38){dataMinY = min(dataMinY,lastY);dataMaxY = max(dataMaxY,lastY);let lastLo = loData[endIdx - 1u];let lastHi = hiData[endIdx - 1u];if(lastLo > -1.0e38){dataMinLo = min(dataMinLo,lastLo);}if(lastHi > -1.0e38){dataMaxHi = max(dataMaxHi,lastHi);}}}else{for(var i = startIdx;i < endIdx;i++){let y = dataY[i];if(y > -1.0e38){dataMinY = min(dataMinY,y);dataMaxY = max(dataMaxY,y);let lo = loData[i];let hi = hiData[i];if(lo > -1.0e38){dataMinLo = min(dataMinLo,lo);}if(hi > -1.0e38){dataMaxHi = max(dataMaxHi,hi);}}}}if(dataMaxY < dataMinY){bandData[outputIdx] = BandData(-1.0,-1.0,-1.0,-1.0,0.0);return;}if(dataMaxHi < dataMinLo){dataMinLo = dataMinY;dataMaxHi = dataMaxY;}let normX =((dataX[startIdx] + dataX[endIdx - 1u])* 0.5 - u.viewMinX)/ viewRangeX;let normMinLo =(dataMinLo - u.viewMinY)/ viewRangeY;let normMaxHi =(dataMaxHi - u.viewMinY)/ viewRangeY;let normMinY =(dataMinY - u.viewMinY)/ viewRangeY;let normMaxY =(dataMaxY - u.viewMinY)/ viewRangeY;let loScreenY = 1.0 - normMinLo;let hiScreenY = 1.0 - normMaxHi;let centerScreenY = 1.0 -(normMinY + normMaxY)* 0.5;bandData[outputIdx] = BandData(normX,loScreenY,hiScreenY,centerScreenY,1.0);}`;
+var ERROR_BAND_FILL_RENDER_SHADER = `${UNIFORM_STRUCT}struct ErrorBandUniforms{maxSamplesPerPixel: u32,bandOpacity: f32,_p0: u32,_p1: u32,};struct BandData{screenX: f32,loScreenY: f32,hiScreenY: f32,centerScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> bandData: array<BandData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;@group(0)@binding(3)var<uniform> eu: ErrorBandUniforms;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)seriesIdx: u32,@location(1)@interpolate(flat)valid: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.valid = 0.0;let maxCols = u32(u.width);if(vi >= maxCols * 2u){out.pos = vec4f(0.0,0.0,0.0,0.0);return out;}let col = vi / 2u;let onHi =(vi % 2u)== 0u;let d = bandData[col];let viewRangeX = u.viewMaxX - u.viewMinX;let leftBound = select(0.0,clamp((u.dataMinX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);let rightBound = select(1.0,clamp((u.dataMaxX - u.viewMinX)/ viewRangeX,0.0,1.0),viewRangeX > 0.0001);var sx = clamp(d.screenX,leftBound,rightBound);var py = select(d.loScreenY,d.hiScreenY,onHi);if(d.valid < 0.5 && vi > 0u){let prevCol =(vi - 1u)/ 2u;let pd = bandData[prevCol];sx = clamp(pd.screenX,leftBound,rightBound);py = select(pd.loScreenY,pd.hiScreenY,(vi - 1u)% 2u == 0u);}let clipX = sx * 2.0 - 1.0;let clipY = 1.0 - py * 2.0;out.valid = d.valid;out.pos = vec4f(clipX,clipY,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.valid < 0.5){discard;}let series = allSeries[in.seriesIdx];let dim = select(1.0,0.35,u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);return vec4f(mix(vec3f(u.bgR,u.bgG,u.bgB),series.color.rgb,dim),eu.bandOpacity * dim);}`;
+var ERROR_BAND_LINE_RENDER_SHADER = `${UNIFORM_STRUCT}struct BandData{screenX: f32,loScreenY: f32,hiScreenY: f32,centerScreenY: f32,valid: f32,};@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> bandData: array<BandData>;@group(0)@binding(2)var<storage,read> allSeries: array<SeriesInfo>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)alpha: f32,@location(1)@interpolate(flat)seriesIdx: u32,};@vertex fn vs(@builtin(vertex_index)vi: u32,@builtin(instance_index)series_idx: u32)-> VertexOutput{var out: VertexOutput;out.seriesIdx = series_idx;out.alpha = 0.0;let maxCols = u32(u.width);let segIdx = vi / 2u;let endpoint = vi % 2u;if(segIdx + 1u > maxCols){out.pos = vec4f(0.0,0.0,0.0,0.0);return out;}let col = segIdx + endpoint;if(col >= maxCols){out.pos = vec4f(0.0,0.0,0.0,0.0);return out;}let d = bandData[col];let d0 = bandData[segIdx];let d1 = bandData[segIdx + 1u];let segValid = min(d0.valid,d1.valid);out.pos = vec4f(d.screenX * 2.0 - 1.0,1.0 - d.centerScreenY * 2.0,0.0,segValid);out.alpha = segValid;return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{if(in.alpha < 0.1){discard;}let series = allSeries[in.seriesIdx];let dim = select(1.0,0.35,u.highlight != 0xffffffffu && in.seriesIdx != u.highlight);return vec4f(mix(vec3f(u.bgR,u.bgG,u.bgB),series.color.rgb,dim),1.0);}`;
 
 // src/charts/experimental/error-band.ts
 var ErrorBandChart = {
@@ -5135,84 +3281,7 @@ fn effectiveInterval() -> f32 {
   }
   return raw;
 }`;
-var OHLC_RENDER_SHADER = `${UNIFORM_STRUCT}
-${CANDLE_TYPES2}
-@group(0) @binding(0) var<uniform>       u:          Uniforms;
-@group(0) @binding(1) var<storage, read> candleData: array<CandleData>;
-@group(0) @binding(2) var<uniform>       cu:         CandleUniforms;
-${EFFECTIVE_INTERVAL2}
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) isUp: f32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
-var out: VertexOutput;
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let interval   = effectiveInterval();
-let numBins    = min(u32(ceil(viewRangeX / interval)) + 2u, u32(u.width));
-let colIdx     = vi / 18u;
-let localVi    = vi % 18u;
-let section    = localVi / 6u;
-let vertexType = localVi % 6u;
-if (colIdx >= numBins) {
-  out.pos = vec4f(0.0, 0.0, 0.0, 0.0); out.isUp = 0.0; return out;
-}
-let cd = candleData[colIdx];
-if (cd.barWidth <= 0.0) {
-  out.pos = vec4f(0.0, 0.0, 0.0, 0.0); out.isUp = 0.0; return out;
-}
-out.isUp = cd.isUp;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
-let onePixelX  = 1.0 / u.width;
-let onePixelY  = 1.0 / u.height;
-let wickWidth  = max(onePixelX, cd.barWidth * 0.07);
-let tickHalfH  = max(onePixelY, wickWidth * u.width / u.height);
-// isUp > 0.5: close >= open → bodyBottom = open, bodyTop = close
-// isUp <= 0.5: close < open → bodyBottom = close, bodyTop = open
-let openPrice  = select(cd.bodyTop,    cd.bodyBottom, cd.isUp > 0.5);
-let closePrice = select(cd.bodyBottom, cd.bodyTop,    cd.isUp > 0.5);
-var sLeft: f32; var sRight: f32; var sTop: f32; var sBottom: f32;
-if (section == 0u) {
-  // Vertical wick: spans low to high
-  let nb = (cd.low  - u.viewMinY) / safeRangeY;
-  let nt = (cd.high - u.viewMinY) / safeRangeY;
-  sBottom = 1.0 - nb; sTop = 1.0 - nt;
-  sLeft = cd.screenX - wickWidth; sRight = cd.screenX + wickWidth;
-} else if (section == 1u) {
-  // Open tick: horizontal rect extending LEFT from center
-  let ny = (openPrice - u.viewMinY) / safeRangeY;
-  let sy = 1.0 - ny;
-  sTop = sy - tickHalfH; sBottom = sy + tickHalfH;
-  sLeft  = cd.screenX - cd.barWidth * 0.45;
-  sRight = cd.screenX;
-} else {
-  // Close tick: horizontal rect extending RIGHT from center
-  let ny = (closePrice - u.viewMinY) / safeRangeY;
-  let sy = 1.0 - ny;
-  sTop = sy - tickHalfH; sBottom = sy + tickHalfH;
-  sLeft  = cd.screenX;
-  sRight = cd.screenX + cd.barWidth * 0.45;
-}
-var positions = array<vec2f, 6>(
-  vec2f(sLeft,  sBottom),
-  vec2f(sRight, sBottom),
-  vec2f(sLeft,  sTop),
-  vec2f(sLeft,  sTop),
-  vec2f(sRight, sBottom),
-  vec2f(sRight, sTop)
-);
-let sp = positions[vertexType];
-out.pos = vec4f(sp.x * 2.0 - 1.0, 1.0 - sp.y * 2.0, 0.0, 1.0);
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let upRgb   = unpack4x8unorm(cu.upColor).rgb;
-let downRgb = unpack4x8unorm(cu.downColor).rgb;
-let color   = select(downRgb, upRgb, in.isUp > 0.5);
-return vec4f(color, 0.92);
-}
-`;
+var OHLC_RENDER_SHADER = `${UNIFORM_STRUCT}${CANDLE_TYPES2}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> candleData: array<CandleData>;@group(0)@binding(2)var<uniform> cu: CandleUniforms;${EFFECTIVE_INTERVAL2}struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)isUp: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32)-> VertexOutput{var out: VertexOutput;let viewRangeX = u.viewMaxX - u.viewMinX;let interval = effectiveInterval();let numBins = min(u32(ceil(viewRangeX / interval))+ 2u,u32(u.width));let colIdx = vi / 18u;let localVi = vi % 18u;let section = localVi / 6u;let vertexType = localVi % 6u;if(colIdx >= numBins){out.pos = vec4f(0.0,0.0,0.0,0.0);out.isUp = 0.0;return out;}let cd = candleData[colIdx];if(cd.barWidth <= 0.0){out.pos = vec4f(0.0,0.0,0.0,0.0);out.isUp = 0.0;return out;}out.isUp = cd.isUp;let viewRangeY = u.viewMaxY - u.viewMinY;let safeRangeY = select(viewRangeY,1.0,viewRangeY < 0.0001);let onePixelX = 1.0 / u.width;let onePixelY = 1.0 / u.height;let wickWidth = max(onePixelX,cd.barWidth * 0.07);let tickHalfH = max(onePixelY,wickWidth * u.width / u.height);let openPrice = select(cd.bodyTop,cd.bodyBottom,cd.isUp > 0.5);let closePrice = select(cd.bodyBottom,cd.bodyTop,cd.isUp > 0.5);var sLeft: f32;var sRight: f32;var sTop: f32;var sBottom: f32;if(section == 0u){let nb =(cd.low - u.viewMinY)/ safeRangeY;let nt =(cd.high - u.viewMinY)/ safeRangeY;sBottom = 1.0 - nb;sTop = 1.0 - nt;sLeft = cd.screenX - wickWidth;sRight = cd.screenX + wickWidth;}else if(section == 1u){let ny =(openPrice - u.viewMinY)/ safeRangeY;let sy = 1.0 - ny;sTop = sy - tickHalfH;sBottom = sy + tickHalfH;sLeft = cd.screenX - cd.barWidth * 0.45;sRight = cd.screenX;}else{let ny =(closePrice - u.viewMinY)/ safeRangeY;let sy = 1.0 - ny;sTop = sy - tickHalfH;sBottom = sy + tickHalfH;sLeft = cd.screenX;sRight = cd.screenX + cd.barWidth * 0.45;}var positions = array<vec2f,6>(vec2f(sLeft,sBottom),vec2f(sRight,sBottom),vec2f(sLeft,sTop),vec2f(sLeft,sTop),vec2f(sRight,sBottom),vec2f(sRight,sTop));let sp = positions[vertexType];out.pos = vec4f(sp.x * 2.0 - 1.0,1.0 - sp.y * 2.0,0.0,1.0);return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let upRgb = unpack4x8unorm(cu.upColor).rgb;let downRgb = unpack4x8unorm(cu.downColor).rgb;let color = select(downRgb,upRgb,in.isUp > 0.5);return vec4f(color,0.92);}`;
 
 // src/charts/experimental/ohlc.ts
 var BYTES_PER_CANDLE2 = 7 * 4;
@@ -5305,72 +3374,7 @@ struct WaterfallUniforms {
   totalColor: u32,
   _pad:       u32,
 };`;
-var WATERFALL_RENDER_SHADER = `${UNIFORM_STRUCT}
-${WATERFALL_TYPES}
-@group(0) @binding(0) var<uniform>       u:      Uniforms;
-@group(0) @binding(1) var<storage, read> dataX:  array<f32>;
-@group(0) @binding(2) var<storage, read> dataY:  array<f32>;
-@group(0) @binding(3) var<uniform>       wu:     WaterfallUniforms;
-@group(0) @binding(4) var<storage, read> dataH:  array<f32>;
-@group(0) @binding(5) var<storage, read> dataT:  array<f32>;
-@group(0) @binding(6) var<storage, read> dataBW: array<f32>;
-struct VertexOutput {
-@builtin(position) pos: vec4f,
-@location(0) @interpolate(flat) colorType: f32,
-};
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
-var out: VertexOutput;
-let barIdx     = vi / 6u;
-let vertexType = vi % 6u;
-let count      = u.pointCount;
-if (barIdx >= count) {
-  out.pos = vec4f(0.0, 0.0, 0.0, 1.0); out.colorType = 0.0; return out;
-}
-let x          = dataX[barIdx];
-let barBottom  = dataY[barIdx];
-let barHeight  = max(dataH[barIdx], 0.0);
-let barTop     = barBottom + barHeight;
-let barWidth   = dataBW[barIdx];
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeX = select(viewRangeX, 1.0, viewRangeX < 0.0001);
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
-let screenX    = (x - u.viewMinX) / safeRangeX;
-let halfW      = (barWidth * 0.5) / safeRangeX;
-let left       = screenX - halfW;
-let right      = screenX + halfW;
-let normBottom = (barBottom - u.viewMinY) / safeRangeY;
-let normTop    = (barTop    - u.viewMinY) / safeRangeY;
-let sBottom    = max(1.0 - normBottom, 1.0 - normTop);
-let sTop       = min(1.0 - normBottom, 1.0 - normTop);
-var positions  = array<vec2f, 6>(
-  vec2f(left,  sBottom),
-  vec2f(right, sBottom),
-  vec2f(left,  sTop),
-  vec2f(left,  sTop),
-  vec2f(right, sBottom),
-  vec2f(right, sTop)
-);
-let sp = positions[vertexType];
-out.pos       = vec4f(sp.x * 2.0 - 1.0, 1.0 - sp.y * 2.0, 0.0, 1.0);
-out.colorType = dataT[barIdx];
-return out;
-}
-@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-let upRgb    = unpack4x8unorm(wu.upColor).rgb;
-let downRgb  = unpack4x8unorm(wu.downColor).rgb;
-let totalRgb = unpack4x8unorm(wu.totalColor).rgb;
-var color: vec3f;
-if (in.colorType < 0.5) {
-  color = upRgb;
-} else if (in.colorType < 1.5) {
-  color = downRgb;
-} else {
-  color = totalRgb;
-}
-return vec4f(color, 0.9);
-}
-`;
+var WATERFALL_RENDER_SHADER = `${UNIFORM_STRUCT}${WATERFALL_TYPES}@group(0)@binding(0)var<uniform> u: Uniforms;@group(0)@binding(1)var<storage,read> dataX: array<f32>;@group(0)@binding(2)var<storage,read> dataY: array<f32>;@group(0)@binding(3)var<uniform> wu: WaterfallUniforms;@group(0)@binding(4)var<storage,read> dataH: array<f32>;@group(0)@binding(5)var<storage,read> dataT: array<f32>;@group(0)@binding(6)var<storage,read> dataBW: array<f32>;struct VertexOutput{@builtin(position)pos: vec4f,@location(0)@interpolate(flat)colorType: f32,};@vertex fn vs(@builtin(vertex_index)vi: u32)-> VertexOutput{var out: VertexOutput;let barIdx = vi / 6u;let vertexType = vi % 6u;let count = u.pointCount;if(barIdx >= count){out.pos = vec4f(0.0,0.0,0.0,1.0);out.colorType = 0.0;return out;}let x = dataX[barIdx];let barBottom = dataY[barIdx];let barHeight = max(dataH[barIdx],0.0);let barTop = barBottom + barHeight;let barWidth = dataBW[barIdx];let viewRangeX = u.viewMaxX - u.viewMinX;let viewRangeY = u.viewMaxY - u.viewMinY;let safeRangeX = select(viewRangeX,1.0,viewRangeX < 0.0001);let safeRangeY = select(viewRangeY,1.0,viewRangeY < 0.0001);let screenX =(x - u.viewMinX)/ safeRangeX;let halfW =(barWidth * 0.5)/ safeRangeX;let left = screenX - halfW;let right = screenX + halfW;let normBottom =(barBottom - u.viewMinY)/ safeRangeY;let normTop =(barTop - u.viewMinY)/ safeRangeY;let sBottom = max(1.0 - normBottom,1.0 - normTop);let sTop = min(1.0 - normBottom,1.0 - normTop);var positions = array<vec2f,6>(vec2f(left,sBottom),vec2f(right,sBottom),vec2f(left,sTop),vec2f(left,sTop),vec2f(right,sBottom),vec2f(right,sTop));let sp = positions[vertexType];out.pos = vec4f(sp.x * 2.0 - 1.0,1.0 - sp.y * 2.0,0.0,1.0);out.colorType = dataT[barIdx];return out;}@fragment fn fs(in: VertexOutput)-> @location(0)vec4f{let upRgb = unpack4x8unorm(wu.upColor).rgb;let downRgb = unpack4x8unorm(wu.downColor).rgb;let totalRgb = unpack4x8unorm(wu.totalColor).rgb;var color: vec3f;if(in.colorType < 0.5){color = upRgb;}else if(in.colorType < 1.5){color = downRgb;}else{color = totalRgb;}return vec4f(color,0.9);}`;
 
 // src/charts/experimental/waterfall.ts
 function prepareWaterfall(positions, deltas, totals) {
@@ -5499,7 +3503,6 @@ function drawPill(ctx, txt, cx, cy, color, dark, fontFamily) {
   ctx.fillText(txt, cx, cy);
   return { x: px, y: py, w: pw, h: ph };
 }
-// The label pills as last drawn, per chart, so a click can be matched to its annotation.
 var pillBoxes = new WeakMap;
 var pointerStates = new WeakMap;
 function pillAt(chart, x, y) {
@@ -5513,8 +3516,6 @@ function pillAt(chart, x, y) {
   }
   return null;
 }
-// Vertical-line labels take lanes: a pill that would overlap the previous one in its lane
-// drops to the next lane, so events seconds apart on a wide window stay readable.
 function assignLanes(items) {
   items.sort((a, b) => a.cx - b.cx);
   const laneEnd = [];
@@ -5529,11 +3530,6 @@ function assignLanes(items) {
 }
 var annotationsPlugin = {
   name: "annotations",
-  // Labels are clickable. A click on a pill calls config.onAnnotationClick with the annotation
-  // and dispatches "chartai-annotation-click" (detail: { id, annotation }) from the host, and
-  // stops there: it reaches neither the zoom plugin nor the host's own click handlers. The
-  // handlers sit on the host rather than the interaction layer, which puts them after the zoom
-  // plugin's, so the pointer cursor set here outlives the cursor that plugin sets on every move.
   install(chart, el) {
     const ac = new AbortController;
     const st = { abort: ac, downX: 0, downY: 0 };
@@ -5555,7 +3551,6 @@ var annotationsPlugin = {
         el.style.cursor = "pointer";
     }, { signal: ac.signal });
     host.addEventListener("click", (e) => {
-      // A drag that ends on a pill is not a click on it.
       if (Math.hypot(e.clientX - st.downX, e.clientY - st.downY) > 4)
         return;
       const { x, y } = local(e);
@@ -5690,9 +3685,6 @@ var annotationsPlugin = {
         vlabels.push({ ann, cx: sx, pw, color, lane: 0 });
       }
     }
-    // A vertical line's label sits in the bottom margin, or, with labelPosition "top", just
-    // inside the top of the plot where the x-axis labels cannot collide with it. Lanes stack
-    // away from that edge.
     assignLanes(vlabels);
     for (const it of vlabels) {
       const step = PILL_HEIGHT + LANE_GAP;
@@ -6076,10 +4068,10 @@ var rangeSelectorPlugin = {
         };
         canvas.style.cursor = "grabbing";
       } else {
-        const hv2 = chart.homeView;
-        const homeRange2 = 1 / hv2.zoomX;
+        const hv = chart.homeView;
+        const homeRange = 1 / hv.zoomX;
         const brushWidth = 1 / v.zoomX;
-        const newPanX = Math.max(hv2.panX, Math.min(hv2.panX + homeRange2 - brushWidth, hv2.panX + rx * homeRange2 - brushWidth / 2));
+        const newPanX = Math.max(hv.panX, Math.min(hv.panX + homeRange - brushWidth, hv.panX + rx * homeRange - brushWidth / 2));
         chart.view.panX = newPanX;
         ChartManager.requestRender(chart.id);
         ChartManager.drawChart(chart);
@@ -6882,24 +4874,24 @@ function findNearestPin(chart, screenX, screenY, width, height) {
   let bestDx = Infinity;
   let bestDy = Infinity;
   for (let s = 0;s < chart.series.length; s++) {
-    const sr2 = chart.series[s];
-    const n = sr2.rawX.length;
+    const sr = chart.series[s];
+    const n = sr.rawX.length;
     if (n === 0)
       continue;
     let lo = 0, hi = n - 1;
     while (lo < hi) {
       const mid = lo + hi >> 1;
-      if (sr2.rawX[mid] < dataX)
+      if (sr.rawX[mid] < dataX)
         lo = mid + 1;
       else
         hi = mid;
     }
     let idx = lo;
-    if (lo > 0 && Math.abs(sr2.rawX[lo - 1] - dataX) < Math.abs(sr2.rawX[lo] - dataX)) {
+    if (lo > 0 && Math.abs(sr.rawX[lo - 1] - dataX) < Math.abs(sr.rawX[lo] - dataX)) {
       idx = lo - 1;
     }
-    const dx = Math.abs(sr2.rawX[idx] - dataX);
-    const dy = Math.abs((sr2.plotY ?? sr2.rawY)[idx] - dataY);
+    const dx = Math.abs(sr.rawX[idx] - dataX);
+    const dy = Math.abs((sr.plotY ?? sr.rawY)[idx] - dataY);
     if (dx < bestDx || dx === bestDx && dy < bestDy) {
       bestDx = dx;
       bestDy = dy;
@@ -7091,39 +5083,39 @@ var watermarkPlugin = {
   }
 };
 export {
-  zoomPlugin,
-  chartMargin,
-  watermarkPlugin,
-  tooltipPinPlugin,
-  thresholdPlugin,
-  statsPlugin,
-  rulerPlugin,
-  rangeSelectorPlugin,
-  prepareWaterfall,
-  packRGB,
-  minimapPlugin,
-  legendPlugin,
-  labelsPlugin,
-  labelsPanelPlugin,
-  hoverPlugin,
-  crosshairPlugin,
-  annotationsPlugin,
-  WaterfallChart,
-  StepChart,
-  ScatterChart,
-  OhlcChart,
-  LineChart,
-  HistogramChart,
-  HeatmapChart,
-  ErrorBandChart,
-  DEFAULT_LABEL_SIZE,
-  DEFAULT_FONT,
-  ChartManager,
-  Chart,
-  CandlestickChart,
-  BubbleChart,
-  BoidsChart,
-  BaselineAreaChart,
+  AreaChart,
   BarChart,
-  AreaChart
+  BaselineAreaChart,
+  BoidsChart,
+  BubbleChart,
+  CandlestickChart,
+  Chart,
+  ChartManager,
+  DEFAULT_FONT,
+  DEFAULT_LABEL_SIZE,
+  ErrorBandChart,
+  HeatmapChart,
+  HistogramChart,
+  LineChart,
+  OhlcChart,
+  ScatterChart,
+  StepChart,
+  WaterfallChart,
+  annotationsPlugin,
+  chartMargin,
+  crosshairPlugin,
+  hoverPlugin,
+  labelsPanelPlugin,
+  labelsPlugin,
+  legendPlugin,
+  minimapPlugin,
+  packRGB,
+  prepareWaterfall,
+  rangeSelectorPlugin,
+  rulerPlugin,
+  statsPlugin,
+  thresholdPlugin,
+  tooltipPinPlugin,
+  watermarkPlugin,
+  zoomPlugin
 };

@@ -1,0 +1,13 @@
+{
+  "name": "chartai-blazor-engine",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript sources of the chartai WebGPU chart engine, bundled by build.ts into ../wwwroot/chartai.js",
+  "scripts": {
+    "build": "bun run build.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

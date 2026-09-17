@@ -18,6 +18,22 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # Pinned: the bundle is byte-compared against the committed one below, and Bun's output
+      # can change between versions.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Build chart engine (engine/src -> wwwroot/chartai.js)
+        working-directory: ChartAI.Blazor/engine
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun run build.ts
+
+      - name: Verify the committed engine bundle is current
+        run: git diff --exit-code --stat -- ChartAI.Blazor/wwwroot/chartai.js
+
       - name: Restore
         run: dotnet restore ChartAI.Blazor.slnx
 

@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- The chart engine is built from TypeScript again. `ChartAI.Blazor/engine/src` holds the chartai sources (upstream 1.1.0 plus every change this project had made to the bundle), and `engine/build.ts` bundles them with Bun into `wwwroot/chartai.js`. The .NET build runs it when Bun is installed and a source is newer than the bundle; CI rebuilds the bundle and fails when the committed one is stale. The WGSL shaders in the bundle are now minified, as in upstream's own builds.
+
 ## [1.1.4] - 2026-09-11
 
 ### Changed

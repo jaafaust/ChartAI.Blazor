@@ -176,6 +176,29 @@ are optional exact bounds; otherwise each axis auto-scales to its own series.
 dotnet run --project ChartAI.Blazor.Demo
 ```
 
+## Building the chart engine
+
+`ChartAI.Blazor/wwwroot/chartai.js` is generated. Its sources are the TypeScript files under
+`ChartAI.Blazor/engine/src`: the [chartai](https://github.com/dgerrells/chartai) engine
+(upstream 1.1.0) plus this project's changes (in-place data patching, several Y axes, hover
+highlighting, gap handling, and so on). `engine/build.ts` bundles them with
+[Bun](https://bun.sh) into that one file, GPU worker inlined, the same way upstream builds its
+own `dist/chart-library.js`.
+
+* `dotnet build` runs the bundler automatically when Bun is on the PATH and a source file is
+  newer than the bundle. Without Bun the committed bundle is used and a warning is logged.
+  `-p:ChartAiSkipEngineBuild=true` disables the step.
+* To build by hand, run in `ChartAI.Blazor/engine`:
+
+  ```bash
+  bun run build.ts
+  ```
+
+* `bun install` then `bun run typecheck` type-checks the sources (needs nothing else).
+* The bundle is committed so that consumers and CI can build without Bun. CI rebuilds it with a
+  pinned Bun version and fails when the committed file is stale, so rebuild and commit
+  `wwwroot/chartai.js` together with any change under `engine/src`.
+
 ## Releasing
 
 Releases are published by the `Release` GitHub Actions workflow. Push a tag `vX.Y.Z` and the
