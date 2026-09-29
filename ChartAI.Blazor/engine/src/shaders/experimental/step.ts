@@ -27,7 +27,7 @@ struct VertexOutput {
 @vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&lineData));
 let spanVerts = maxCols * 2u;
 if (vi < spanVerts) {
 let segIdx = vi / 2u;

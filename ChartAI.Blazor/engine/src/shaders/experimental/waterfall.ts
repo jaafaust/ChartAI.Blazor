@@ -23,27 +23,35 @@ ${WATERFALL_TYPES}
 @group(0) @binding(4) var<storage, read> dataH:  array<f32>;
 @group(0) @binding(5) var<storage, read> dataT:  array<f32>;
 @group(0) @binding(6) var<storage, read> dataBW: array<f32>;
+@group(0) @binding(7) var<storage, read> allSeries: array<SeriesInfo>;
 struct VertexOutput {
 @builtin(position) pos: vec4f,
 @location(0) @interpolate(flat) colorType: f32,
 };
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
+// The worker draws series i as instance i: its bars are [visibleRange.x, visibleRange.x + visibleRange.y).
+@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
 var out: VertexOutput;
-let barIdx     = vi / 6u;
+let range      = allSeries[series_idx].visibleRange;
+let bar        = vi / 6u;
 let vertexType = vi % 6u;
-let count      = u.pointCount;
-if (barIdx >= count) {
+if (bar >= range.y) {
   out.pos = vec4f(0.0, 0.0, 0.0, 1.0); out.colorType = 0.0; return out;
 }
+let barIdx     = range.x + bar;
 let x          = dataX[barIdx];
 let barBottom  = dataY[barIdx];
 let barHeight  = max(dataH[barIdx], 0.0);
 let barTop     = barBottom + barHeight;
 let barWidth   = dataBW[barIdx];
+// A gap (-3e38, GPU_GAP in chart-library.ts; a missing sorted x is +3e38) in position, base
+// or width draws no bar.
+if (abs(x) > 1.0e38 || barBottom < -1.0e38 || barWidth < -1.0e38) {
+  out.pos = vec4f(0.0, 0.0, 0.0, 1.0); out.colorType = 0.0; return out;
+}
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeX = select(viewRangeX, 1.0, viewRangeX < 0.0001);
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
+let safeRangeX = select(viewRangeX, 1.0, viewRangeX <= 0.0);
+let safeRangeY = select(viewRangeY, 1.0, viewRangeY <= 0.0);
 let screenX    = (x - u.viewMinX) / safeRangeX;
 let halfW      = (barWidth * 0.5) / safeRangeX;
 let left       = screenX - halfW;

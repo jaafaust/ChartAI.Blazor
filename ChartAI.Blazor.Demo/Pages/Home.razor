@@ -117,8 +117,8 @@
             <div class="stats-display">@_bigDataStats</div>
         </div>
         <div class="chart-row">
-            <ChartCard Label="Big Data Line" Info="@_bigDataLineInfo" Config="Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price)" Series="_bigDataLineSeries" />
-            <ChartCard Label="Big Data Scatter" Info="@_bigDataScatterInfo" Config="Cfg(ChartType.Scatter, AxisFormat.Index, AxisFormat.Number)" Series="_bigDataScatterSeries" />
+            <ChartCard Label="Big Data Line" Info="@_bigDataLineInfo" Config="_bigDataLineCfg" Series="_bigDataLineSeries" />
+            <ChartCard Label="Big Data Scatter" Info="@_bigDataScatterInfo" Config="_bigDataScatterCfg" Series="_bigDataScatterSeries" />
         </div>
     </div>
 
@@ -141,7 +141,7 @@
         </div>
         <div class="chart-row">
             <ChartCard Label="Massive Multi-Series Line" Info="@_bigSeriesInfo" FullWidth="true"
-                       Config="Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price)" Series="_bigSeriesSeries" />
+                       Config="_bigSeriesCfg" Series="_bigSeriesSeries" />
         </div>
     </div>
 

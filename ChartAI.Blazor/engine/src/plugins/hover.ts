@@ -4,6 +4,7 @@ import { M } from "../msg.ts";
 import { DEFAULT_FONT } from "./labels.ts";
 import { chartMargin, seriesAxisFormat } from "./shared.ts";
 import { dataToScreen, screenToData } from "./coords.ts";
+import { scheduleDraw } from "./redraw.ts";
 
 const MAX_HOVER_PX = 50;
 
@@ -182,9 +183,15 @@ interface HoverState {
   pillY: number;
   pillTargetX: number;
   pillTargetY: number;
-  pillAnimRef: number | null;
+  // performance.now() of the pills' last step; 0 puts them straight on their target.
+  pillTime: number;
   abort: AbortController;
 }
+
+// The pills count as arrived within this many px of their target; one step covers at most
+// this many ms.
+const PILL_SETTLE_PX = 0.5;
+const PILL_MAX_STEP_MS = 50;
 
 const states = new WeakMap<InternalChart, HoverState>();
 
@@ -201,7 +208,7 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
       pillY: 0,
       pillTargetX: 0,
       pillTargetY: 0,
-      pillAnimRef: null,
+      pillTime: 0,
       abort: ac,
     };
     states.set(chart, s);
@@ -214,24 +221,12 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
         s.highlight = hl;
         mgr["worker"]?.postMessage({ type: M.SET_STYLE, id: el.dataset.chartId, highlightSeries: hl });
       }
-      if (!(chart.config.showTooltip ?? false)) return;
-      s.hoverResult = res;
-      mgr.drawChart(chart);
-
-      if (res && !s.pillAnimRef) {
-        let lastT = performance.now();
-        const tick = (now: number) => {
-          if (!s.hoverResult) return (s.pillAnimRef = null);
-          const f =
-            1 - Math.pow(0.5, (now - lastT) / (chart.config.pillDecayMs ?? 60));
-          lastT = now;
-          s.pillX += (s.pillTargetX - s.pillX) * f;
-          s.pillY += (s.pillTargetY - s.pillY) * f;
-          mgr.drawChart(chart);
-          s.pillAnimRef = requestAnimationFrame(tick);
-        };
-        s.pillAnimRef = requestAnimationFrame(tick);
-      }
+      // Stored (or cleared) before looking at showTooltip, so a tooltip switched off while the
+      // cursor is on the chart does not stay behind. One draw per frame, however many moves.
+      const shown = s.hoverResult !== null;
+      s.hoverResult = chart.config.showTooltip ? res : null;
+      if (!s.hoverResult) s.pillTime = 0;
+      if (shown || s.hoverResult) scheduleDraw(chart);
     };
 
     const handleHover = (clientX: number, clientY: number) => {
@@ -279,11 +274,8 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
     const h = chart.height;
     const margin = chartMargin(chart);
     const dark = ChartManager.isDark;
-    const {
-      formatX = String,
-      formatY = String,
-      fontFamily = DEFAULT_FONT,
-    } = chart.config;
+    const formatX = chart.config.formatX ?? String;
+    const fontFamily = chart.config.fontFamily ?? DEFAULT_FONT;
 
     const { x: px, y: py } = dataToScreen(hvr.x, hvr.y, chart, w, h);
 
@@ -323,6 +315,9 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
       rgb: string;
       col: string;
     };
+    // Samples of other series count as "at the hovered x" within a ten-millionth of the visible
+    // x span (far below a pixel): a fixed 1e-4 matched the wrong column on µs-spaced x.
+    const xTol = ((chart.bounds.maxX - chart.bounds.minX) / chart.view.zoomX) * 1e-7;
     const seriesData = chart.series
       .map((ser, si): SeriesPoint | null => {
         if (chart.config?.hiddenSeries?.has(si)) return null;
@@ -330,7 +325,7 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
           r = ser.rawX.length - 1;
         while (l <= r) {
           const m = (l + r) >> 1;
-          if (Math.abs(ser.rawX[m] - hvr.x) < 0.0001) {
+          if (Math.abs(ser.rawX[m] - hvr.x) <= xTol) {
             const v = ser.rawY[m];
             if (v == null || v !== v) return null;
             const rgb = `${Math.round(ser.color.r * 255)},${Math.round(ser.color.g * 255)},${Math.round(ser.color.b * 255)}`;
@@ -357,11 +352,29 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
     const displayData = seriesData.slice(0, 5);
     const remainingCount = totalSeries - displayData.length;
 
+    // The pills glide after the cursor. Each draw moves them toward the target by the time
+    // since the previous one (at most a slow frame's worth, so the first move after a rest
+    // glides too), and asks for another draw only until they have arrived: a resting cursor
+    // costs no frames. Without a y (a gap) the y pill keeps its place.
     s.pillTargetX = px;
     s.pillTargetY = py;
-    if (!s.pillAnimRef) {
+    const now = performance.now();
+    const decay = chart.config.pillDecayMs ?? 60;
+    const f =
+      s.pillTime && decay > 0
+        ? 1 - Math.pow(0.5, Math.min(now - s.pillTime, PILL_MAX_STEP_MS) / decay)
+        : 1;
+    s.pillTime = now;
+    s.pillX = Number.isFinite(s.pillX) ? s.pillX + (px - s.pillX) * f : px;
+    if (hasY) s.pillY = Number.isFinite(s.pillY) ? s.pillY + (py - s.pillY) * f : py;
+    if (
+      Math.abs(px - s.pillX) < PILL_SETTLE_PX &&
+      (!hasY || Math.abs(py - s.pillY) < PILL_SETTLE_PX)
+    ) {
       s.pillX = px;
-      s.pillY = py;
+      if (hasY) s.pillY = py;
+    } else {
+      scheduleDraw(chart);
     }
 
     const drawPill = (x: number, y: number, txt: string, isX: boolean, anchorLeft?: boolean) => {
@@ -509,7 +522,6 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
 
   uninstall(chart) {
     const s = states.get(chart);
-    if (s?.pillAnimRef) cancelAnimationFrame(s.pillAnimRef);
     s?.abort.abort();
     states.delete(chart);
   },

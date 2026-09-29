@@ -6,12 +6,20 @@ namespace ChartAI.Blazor.Models;
 /// Full configuration surface for a chartai chart. Mirrors the union of every
 /// renderer config and plugin config in the original library. Unset (null)
 /// fields are omitted from the JSON sent to the engine so engine defaults apply.
+/// A NaN or infinite value in any numeric option travels as null, like an unset one; an
+/// annotation or threshold without a finite value is not drawn.
 /// </summary>
 public class ChartConfig
 {
     [JsonPropertyName("type")]
     public ChartType Type { get; set; } = ChartType.Line;
 
+    /// <summary>
+    /// True switches the engine to its dark theme; setting it back to false after that switches
+    /// to light. The theme is global: it applies to every chart on the page, not only this one.
+    /// Left false, the chart does not touch the theme, which then follows a <c>dark</c> class on
+    /// <c>&lt;html&gt;</c> when the engine starts, or the module's <c>setTheme</c>.
+    /// </summary>
     [JsonPropertyName("isDark")]
     public bool IsDark { get; set; }
 
@@ -21,6 +29,7 @@ public class ChartConfig
 
     [JsonPropertyName("pillDecayMs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? PillDecayMs { get; set; }
 
     /// <summary>Built-in formatter for X-axis tick labels and tooltips.</summary>
@@ -46,6 +55,7 @@ public class ChartConfig
 
     [JsonPropertyName("labelSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? LabelSize { get; set; }
 
     // ─── Zoom ──────────────────────────────────────────────────────────────
@@ -59,6 +69,7 @@ public class ChartConfig
 
     [JsonPropertyName("bgColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? BgColor { get; set; }
 
     /// <summary>
@@ -90,14 +101,17 @@ public class ChartConfig
     // ─── Renderer-specific numeric uniforms ────────────────────────────────
     [JsonPropertyName("pointSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? PointSize { get; set; }
 
     [JsonPropertyName("maxSamplesPerPixel")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxSamplesPerPixel { get; set; }
 
     [JsonPropertyName("bandOpacity")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? BandOpacity { get; set; }
 
     /// <summary>
@@ -106,6 +120,7 @@ public class ChartConfig
     /// </summary>
     [JsonPropertyName("barOpacity")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? BarOpacity { get; set; }
 
     // step
@@ -120,10 +135,12 @@ public class ChartConfig
 
     [JsonPropertyName("minValue")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinValue { get; set; }
 
     [JsonPropertyName("maxValue")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxValue { get; set; }
 
     // heatmap
@@ -142,36 +159,44 @@ public class ChartConfig
     // bubble
     [JsonPropertyName("maxPointSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxPointSize { get; set; }
 
     [JsonPropertyName("minPointSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinPointSize { get; set; }
 
     // baseline-area
     [JsonPropertyName("baseline")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Baseline { get; set; }
 
     [JsonPropertyName("positiveColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? PositiveColor { get; set; }
 
     [JsonPropertyName("negativeColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? NegativeColor { get; set; }
 
     // candlestick / ohlc / waterfall
     [JsonPropertyName("upColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? UpColor { get; set; }
 
     [JsonPropertyName("downColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? DownColor { get; set; }
 
     [JsonPropertyName("totalColor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? TotalColor { get; set; }
 
     [JsonPropertyName("binSize")]
@@ -180,10 +205,12 @@ public class ChartConfig
 
     [JsonPropertyName("interval")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Interval { get; set; }
 
     [JsonPropertyName("maxSamples")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxSamples { get; set; }
 
     // ─── Multiple Y axes ───────────────────────────────────────────────────
@@ -203,6 +230,7 @@ public class ChartConfig
     /// <summary>Horizontal distance in px between adjacent Y-axis strips on the same side (default 6).</summary>
     [JsonPropertyName("yAxisGap")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? YAxisGap { get; set; }
 
     // ─── Legend (nested) ───────────────────────────────────────────────────
@@ -234,10 +262,12 @@ public class ChartConfig
 
     [JsonPropertyName("crosshairDash")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? CrosshairDash { get; set; }
 
     [JsonPropertyName("crosshairWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? CrosshairWidth { get; set; }
 
     // ─── Watermark ─────────────────────────────────────────────────────────
@@ -251,10 +281,12 @@ public class ChartConfig
 
     [JsonPropertyName("watermarkOpacity")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? WatermarkOpacity { get; set; }
 
     [JsonPropertyName("watermarkFontSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? WatermarkFontSize { get; set; }
 
     [JsonPropertyName("watermarkColor")]
@@ -263,6 +295,7 @@ public class ChartConfig
 
     [JsonPropertyName("watermarkRotation")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? WatermarkRotation { get; set; }
 
     // ─── Stats ─────────────────────────────────────────────────────────────
@@ -307,19 +340,23 @@ public class ChartConfig
 
     [JsonPropertyName("minimapSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinimapSize { get; set; }
 
     [JsonPropertyName("minimapOpacity")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinimapOpacity { get; set; }
 
     // ─── Range selector ────────────────────────────────────────────────────
     [JsonPropertyName("rangeSelectorHeight")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? RangeSelectorHeight { get; set; }
 
     [JsonPropertyName("rangeSelectorMargin")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? RangeSelectorMargin { get; set; }
 
     [JsonPropertyName("brushColor")]
@@ -331,18 +368,22 @@ public class ChartBounds
 {
     [JsonPropertyName("minX")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinX { get; set; }
 
     [JsonPropertyName("maxX")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxX { get; set; }
 
     [JsonPropertyName("minY")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MinY { get; set; }
 
     [JsonPropertyName("maxY")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? MaxY { get; set; }
 }
 
@@ -369,11 +410,13 @@ public class YAxisConfig
     /// <summary>Manual lower bound (exact, no padding). Null = auto from the axis' series.</summary>
     [JsonPropertyName("min")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Min { get; set; }
 
     /// <summary>Manual upper bound (exact, no padding). Null = auto from the axis' series.</summary>
     [JsonPropertyName("max")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Max { get; set; }
 
     /// <summary>Tick label color (CSS). Defaults to the chart text color.</summary>
@@ -388,6 +431,7 @@ public class YAxisConfig
     /// </summary>
     [JsonPropertyName("width")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Width { get; set; }
 }
 
@@ -407,6 +451,7 @@ public class LegendConfig
 
     [JsonPropertyName("labelSize")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? LabelSize { get; set; }
 
     [JsonPropertyName("textColor")]
@@ -420,10 +465,12 @@ public class Annotation
     public AnnotationType Type { get; set; } = AnnotationType.HLine;
 
     [JsonPropertyName("value")]
+    [JsonConverter(typeof(GapDoubleConverter))]
     public double Value { get; set; }
 
     [JsonPropertyName("value2")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? Value2 { get; set; }
 
     [JsonPropertyName("label")]
@@ -436,10 +483,12 @@ public class Annotation
 
     [JsonPropertyName("dash")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? Dash { get; set; }
 
     [JsonPropertyName("lineWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? LineWidth { get; set; }
 
     /// <summary>Names the annotation in the chart's AnnotationClicked when its label is clicked.</summary>
@@ -456,6 +505,7 @@ public class Annotation
 public class Threshold
 {
     [JsonPropertyName("y")]
+    [JsonConverter(typeof(GapDoubleConverter))]
     public double Y { get; set; }
 
     [JsonPropertyName("label")]
@@ -475,9 +525,11 @@ public class Threshold
 
     [JsonPropertyName("lineWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? LineWidth { get; set; }
 
     [JsonPropertyName("dash")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[]? Dash { get; set; }
 }

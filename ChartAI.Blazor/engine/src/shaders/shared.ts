@@ -2,6 +2,23 @@
 
 export const COMPUTE_WG = 256;
 
+// WebGPU's guaranteed maxComputeWorkgroupsPerDimension.
+export const MAX_WG_DIM = 65535;
+
+// Workgroups for one invocation per sample, split into two dimensions once one would pass
+// MAX_WG_DIM. Shaders dispatched this way index samples with SAMPLE_INDEX.
+export function dispatch2D(samples: number): { x: number; y: number } {
+  const total = Math.ceil(Math.max(1, samples) / COMPUTE_WG);
+  const x = Math.min(total, MAX_WG_DIM);
+  return { x, y: Math.ceil(total / x) };
+}
+
+// The sample index of an invocation of a dispatch2D dispatch; the entry point takes
+// @builtin(global_invocation_id) id and @builtin(num_workgroups) nwg.
+export const SAMPLE_INDEX = `id.y * nwg.x * ${COMPUTE_WG}u + id.x`;
+
+// Uniforms are written once per frame and shared by every series of a chart. A series' own point
+// range is SeriesInfo.visibleRange: samples [x, x + y) of its data buffers.
 export const UNIFORM_STRUCT = `struct Uniforms {
 width: f32,
 height: f32,
@@ -9,7 +26,7 @@ viewMinX: f32,
 viewMaxX: f32,
 viewMinY: f32,
 viewMaxY: f32,
-pointCount: u32,
+_pad0: u32,
 seriesCount: u32,
 isDark: u32,
 bgR: f32,
@@ -38,11 +55,12 @@ _pad2: u32,
 };
 `;
 
-export const BINARY_SEARCH = `fn lowerBound(val: f32, count: u32) -> u32 {
-var lo = 0u;
-var hi = count;
+// First index in [rangeStart, rangeEnd) whose x is not below val (rangeEnd when there is none).
+export const BINARY_SEARCH = `fn lowerBound(val: f32, rangeStart: u32, rangeEnd: u32) -> u32 {
+var lo = rangeStart;
+var hi = rangeEnd;
 while (lo < hi) {
-let mid = (lo + hi) / 2u;
+let mid = lo + (hi - lo) / 2u;
 if (dataX[mid] < val) {
 lo = mid + 1u;
 } else {

@@ -31,6 +31,11 @@ jobs:
           bun run typecheck
           bun run build.ts
 
+      # Engine, interop and worker suites (engine/test): happy-dom plus fakes, no GPU or browser.
+      - name: Test chart engine
+        working-directory: ChartAI.Blazor/engine
+        run: bun run test
+
       - name: Verify the committed engine bundle is current
         run: git diff --exit-code --stat -- ChartAI.Blazor/wwwroot/chartai.js
 
@@ -39,6 +44,9 @@ jobs:
 
       - name: Build
         run: dotnet build ChartAI.Blazor.slnx -c Release --no-restore
+
+      - name: Test (bUnit)
+        run: dotnet test ChartAI.Blazor.slnx -c Release --no-build
 
       - name: Pack (validation only)
         run: dotnet pack ChartAI.Blazor/ChartAI.Blazor.csproj -c Release --no-build -o artifacts

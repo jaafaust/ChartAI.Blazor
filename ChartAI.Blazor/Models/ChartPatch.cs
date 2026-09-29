@@ -27,10 +27,12 @@ public class ChartPatch
     /// <summary>Discards every column whose x is below this value (in addition to <see cref="Drop"/>).</summary>
     [JsonPropertyName("dropBefore")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(GapNullableDoubleConverter))]
     public double? DropBefore { get; set; }
 
     /// <summary>The x values of the new columns, shared by every series.</summary>
     [JsonPropertyName("x")]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[] X { get; set; } = Array.Empty<double>();
 
     /// <summary>

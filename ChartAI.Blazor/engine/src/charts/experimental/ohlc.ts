@@ -1,7 +1,7 @@
 import type { RendererPlugin } from "../../types.ts";
 import { COMPUTE_WG } from "../../shaders/shared.ts";
 import { OHLC_COMPUTE_SHADER, OHLC_RENDER_SHADER } from "../../shaders/experimental/ohlc.ts";
-import { packRGB } from "../candlestick.ts";
+import { packRGB, CandlestickChart } from "../candlestick.ts";
 
 export type { CandlestickConfig as OhlcConfig } from "../candlestick.ts";
 
@@ -72,19 +72,6 @@ export const OhlcChart: RendererPlugin = {
     },
   ],
 
-  computeBounds(series) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const s of series) {
-      for (const x of s.rawX) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-      }
-      for (const y of (s.extra.high ?? [])) { if (y > maxY) maxY = y; }
-      for (const y of (s.extra.low  ?? [])) { if (y < minY) minY = y; }
-    }
-    if (!isFinite(minX)) return { minX: 0, maxX: 1, minY: 0, maxY: 1 };
-    const px = (maxX - minX) * 0.05 || 1;
-    const py = (maxY - minY) * 0.1  || 1;
-    return { minX: minX - px, maxX: maxX + px, minY: minY - py, maxY: maxY + py };
-  },
+  // Same data as a candlestick chart, so the same bounds.
+  computeBounds: CandlestickChart.computeBounds,
 };

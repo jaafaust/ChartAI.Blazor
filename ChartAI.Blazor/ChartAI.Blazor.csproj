@@ -47,13 +47,23 @@
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 
+  <!-- The tests can check the interop payloads (Components/ChartWire.cs), which are internal. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChartAI.Blazor.Tests" />
+  </ItemGroup>
+
   <!-- chartai engine: wwwroot/chartai.js is generated from the TypeScript in engine/src by
        engine/build.ts (Bun, https://bun.sh). The bundle is committed, so a build without Bun
        still works; when Bun is on the PATH and a source is newer than the bundle, the bundle is
-       rebuilt before the .NET build. Skip with -p:ChartAiSkipEngineBuild=true. -->
+       rebuilt before the .NET build. Skip with -p:ChartAiSkipEngineBuild=true.
+       CI byte-compares the committed bundle with one built by the Bun version pinned in
+       .github/workflows/ci.yml and release.yml, and Bun's output can change between versions,
+       so another Bun version does not rebuild it (a warning says so); pass
+       -p:ChartAiAnyBunVersion=true to build with it anyway. -->
   <PropertyGroup>
     <ChartAiEngineDir>$(MSBuildProjectDirectory)/engine</ChartAiEngineDir>
     <ChartAiEngineBundle>$(MSBuildProjectDirectory)/wwwroot/chartai.js</ChartAiEngineBundle>
+    <ChartAiBunVersion>1.4.2</ChartAiBunVersion>
     <DefaultItemExcludes>$(DefaultItemExcludes);engine/node_modules/**;engine/.build/**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -75,16 +85,29 @@
     <Exec Command="bun --version"
           IgnoreExitCode="true"
           IgnoreStandardErrorWarningFormat="true"
+          ConsoleToMSBuild="true"
           StandardOutputImportance="low"
           StandardErrorImportance="low"
           EchoOff="true">
       <Output TaskParameter="ExitCode" PropertyName="_ChartAiBunExitCode" />
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ChartAiBunOutput" />
     </Exec>
-    <Warning Condition="'$(_ChartAiBunExitCode)' != '0'"
-             Text="engine/src is newer than wwwroot/chartai.js but Bun is not installed, so the committed bundle is used as is. Install Bun (https://bun.sh) and rebuild, or run 'bun run build.ts' in $(ChartAiEngineDir)." />
-    <Message Condition="'$(_ChartAiBunExitCode)' == '0'" Importance="high"
-             Text="Building wwwroot/chartai.js from engine/src with Bun" />
-    <Exec Condition="'$(_ChartAiBunExitCode)' == '0'"
+    <PropertyGroup>
+      <_ChartAiBunFound>false</_ChartAiBunFound>
+      <_ChartAiBunFound Condition="'$(_ChartAiBunExitCode)' == '0'">true</_ChartAiBunFound>
+      <_ChartAiBunFoundVersion Condition="'$(_ChartAiBunFound)' == 'true'">$(_ChartAiBunOutput.Trim())</_ChartAiBunFoundVersion>
+      <_ChartAiRunBun>false</_ChartAiRunBun>
+      <_ChartAiRunBun Condition="'$(_ChartAiBunFound)' == 'true' And ('$(_ChartAiBunFoundVersion)' == '$(ChartAiBunVersion)' Or '$(ChartAiAnyBunVersion)' == 'true')">true</_ChartAiRunBun>
+    </PropertyGroup>
+    <Warning Condition="'$(_ChartAiBunFound)' != 'true'"
+             Text="engine/src is newer than wwwroot/chartai.js but Bun is not installed, so the committed bundle is used as is. Install Bun $(ChartAiBunVersion) (https://bun.sh) and rebuild, or run 'bun run build.ts' in $(ChartAiEngineDir)." />
+    <Warning Condition="'$(_ChartAiBunFound)' == 'true' And '$(_ChartAiRunBun)' != 'true'"
+             Text="engine/src is newer than wwwroot/chartai.js, but Bun $(_ChartAiBunFoundVersion) is installed and the bundle is built with Bun $(ChartAiBunVersion) (the version CI checks it against), so the committed bundle is used as is. Install Bun $(ChartAiBunVersion), or pass -p:ChartAiAnyBunVersion=true to build with this version (CI rejects a bundle that differs from its own build)." />
+    <Warning Condition="'$(_ChartAiRunBun)' == 'true' And '$(_ChartAiBunFoundVersion)' != '$(ChartAiBunVersion)'"
+             Text="Building wwwroot/chartai.js with Bun $(_ChartAiBunFoundVersion) instead of $(ChartAiBunVersion): CI rejects the bundle if it differs from what Bun $(ChartAiBunVersion) builds." />
+    <Message Condition="'$(_ChartAiRunBun)' == 'true'" Importance="high"
+             Text="Building wwwroot/chartai.js from engine/src with Bun $(_ChartAiBunFoundVersion)" />
+    <Exec Condition="'$(_ChartAiRunBun)' == 'true'"
           Command="bun run build.ts"
           WorkingDirectory="$(ChartAiEngineDir)" />
   </Target>

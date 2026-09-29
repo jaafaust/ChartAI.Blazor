@@ -3,6 +3,11 @@ name: Release
 # Push a tag like v1.2.3 to publish ChartAI.Blazor 1.2.3 to nuget.org
 # and create a GitHub release with the package attached.
 #
+# The tag must point at a commit on master (where CI ran). A version nuget.org
+# already has fails the run instead of being skipped, and the GitHub release is
+# created only after nuget.org accepted the push, so the package attached to it
+# is always the one nuget.org serves.
+#
 # Authenticates to nuget.org with Trusted Publishing (OIDC), so no API key is
 # stored anywhere. The nuget.org account "jaafaust" must have a trusted
 # publishing policy for repository jaafaust/ChartAI.Blazor, workflow file
@@ -31,6 +36,14 @@ jobs:
       - name: Derive version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Require the tagged commit to be on master
+        run: |
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on master; release from a commit that CI has built on master."
+            exit 1
+          fi
 
       # Same Bun version as ci.yml: the committed bundle must match a fresh build.
       - uses: oven-sh/setup-bun@v2
@@ -65,14 +78,17 @@ jobs:
         with:
           user: jaafaust
 
+      # No --skip-duplicate: a version nuget.org already has fails here (409 Conflict), so a
+      # re-pushed tag cannot attach a freshly built package that differs from the published one.
       - name: Push to nuget.org
+        id: push
         run: >
           dotnet nuget push "artifacts/*.nupkg"
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
 
       - name: GitHub release
+        if: steps.push.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           files: |

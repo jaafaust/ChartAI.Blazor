@@ -1,23 +1,11 @@
 import type { ChartPlugin, ChartConfig, InternalChart } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
-import { chartMargin } from "./shared.ts";
+import { chartMargin, niceTicks } from "./shared.ts";
 import {
   DEFAULT_FONT,
   DEFAULT_LABEL_SIZE,
   type LabelsConfig,
 } from "./labels.ts";
-
-const niceTicks = (min: number, max: number, count: number) => {
-  const range = max - min;
-  if (range <= 0) return [min];
-  const rough = range / count,
-    mag = 10 ** Math.floor(Math.log10(rough)),
-    res = rough / mag;
-  const step = mag * (res <= 1.5 ? 1 : res <= 3 ? 2 : res <= 7 ? 5 : 10);
-  const ticks: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max; v += step) ticks.push(v);
-  return ticks;
-};
 
 const getViewState = (chart: InternalChart<ChartConfig & LabelsConfig>) => {
   const w = chart.width,
@@ -83,11 +71,9 @@ export const labelsPanelPlugin: ChartPlugin<LabelsConfig> = {
   afterDraw(ctx, chart) {
     const { w, h, m, rx, ry, mx, my, bgAlpha, border, font, text } =
       getViewState(chart);
-    const {
-      formatX = String,
-      formatY = String,
-      labelSize = DEFAULT_LABEL_SIZE,
-    } = chart.config;
+    const formatX = chart.config.formatX ?? String;
+    const formatY = chart.config.formatY ?? String;
+    const labelSize = chart.config.labelSize ?? DEFAULT_LABEL_SIZE;
 
     ctx.fillStyle = bgAlpha;
     ctx.fillRect(0, 0, m.left, h - m.bottom);

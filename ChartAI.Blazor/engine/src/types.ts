@@ -84,19 +84,29 @@ export interface HoverData {
 export interface SeriesPatch {
   offset: number;
   count: number;
-  // The shared x array (all series of a patched chart share one x array).
+  // The first valid column (default 0): columns below it are dropped without moving the data,
+  // so a sliding window costs its delta. Hover and bounds ignore them; the GPU skips them.
+  start?: number;
+  // The shared x array (all series of a patched chart share one x array). Omitted: x is
+  // unchanged (the last x array passed stays in use).
   x?: DataArray | null;
   // Per series: the full y array of length `count` plus the renderer's extra arrays (lo/hi, ...).
   series: Array<{ y: DataArray; [key: string]: DataArray | undefined }>;
+  // Moves the runtime window (never config.defaultBounds).
   bounds?: Bounds;
 }
 
 export interface UpdateSeriesOptions {
   // Columns to allocate GPU buffers for, so patchData can append later without reallocating.
   capacity?: number;
-  // Replaces config.defaultBounds before the bounds are derived.
+  // The runtime window: overrides the data and config.defaultBounds for the sides it sets. A
+  // full update without it resets the window to config.defaultBounds and the data.
   bounds?: Partial<Bounds>;
 }
+
+// Chart.configure: a key present with value null (or undefined) resets that option to its
+// default; keys left out keep their current value.
+export type ConfigPatch<C> = { [K in keyof C]?: C[K] | null };
 
 // ChartManager.setSyncViews: which axes linked charts share.
 export type SyncViews = false | "x" | "y" | "both";
@@ -142,6 +152,12 @@ export interface UniformDef {
   name: string;
   type: "f32" | "u32";
   default: number;
+  // Names a config value may use instead of the number (stepMode: "center" -> 2). A u32 given
+  // as [r, g, b] (0..1) is packed like packRGB in charts/candlestick.ts.
+  values?: Record<string, number>;
+  // An absolute x value (histogram minValue/maxValue): it is rebased by the chart's x origin
+  // like the x data before it reaches the GPU.
+  xPosition?: boolean;
 }
 
 export interface PassMeta {
@@ -191,6 +207,8 @@ export interface ChartStats {
 export interface InternalSeries {
   label: string;
   color: ChartColor;
+  // ChartSeries.hidden as given; the legend's toggles are kept apart as overrides by label.
+  hidden?: boolean;
   yAxis?: string | number;
   // Index into InternalChart.yAxes (0 for the implicit single axis).
   axisIndex?: number;
@@ -207,10 +225,21 @@ export interface InternalChart<C extends ChartConfig = ChartConfig> {
   el: HTMLElement;
   backCanvas: HTMLCanvasElement;
   frontCanvas: HTMLCanvasElement;
+  // The canvas whose control went to the GPU worker; replaced when a new worker takes over.
+  gpuCanvas?: HTMLCanvasElement;
+  // CSS size, and the device pixel ratio the canvases were last sized for.
   width: number;
   height: number;
+  dpr: number;
   series: InternalSeries[];
+  // Absolute data bounds (float64). The worker gets x relative to originX.
   bounds: Bounds;
+  // The window setBounds / patchData({ bounds }) / updateSeries({ bounds }) set; it overrides
+  // the data and config.defaultBounds until a full update without bounds. null for none.
+  runtimeBounds?: Partial<Bounds> | null;
+  // Subtracted from every x (data, bounds, x-position uniforms) before it is converted to
+  // float32 for the GPU, so epoch timestamps keep their precision.
+  originX?: number;
   view: { panX: number; panY: number; zoomX: number; zoomY: number };
   homeView: { panX: number; panY: number; zoomX: number; zoomY: number };
   visible: boolean;
@@ -241,7 +270,14 @@ export interface RendererPlugin {
   passes: PassDef[];
   buffers?: BufferDef[];
   uniforms?: UniformDef[];
-  computeBounds?(series: InternalSeries[]): Bounds;
+  // Absolute data bounds; `chart` gives the config and size (width, dpr) they may depend on.
+  computeBounds?(series: InternalSeries[], chart: InternalChart<any>): Bounds;
+  // computeBounds depends on the chart size: the bounds are recomputed on resize (without
+  // re-uploading the data).
+  boundsDependOnSize?: boolean;
+  // false: x is used as given (not sorted). Default true; hover binary-searches sorted x.
+  sortX?: boolean;
+  // Runs before the uniforms are read from the config (it may normalise config values).
   install?(chart: InternalChart<any>, el: HTMLElement): void;
   uninstall?(chart: InternalChart<any>): void;
 }

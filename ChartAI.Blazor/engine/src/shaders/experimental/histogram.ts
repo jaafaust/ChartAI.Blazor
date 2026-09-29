@@ -1,11 +1,23 @@
-import { UNIFORM_STRUCT, COMPUTE_WG } from "../shared.ts";
+import { UNIFORM_STRUCT, COMPUTE_WG, SAMPLE_INDEX } from "../shared.ts";
 
+// The bins split minValue..maxValue evenly when those are set (rebased like the data), else the
+// chart's x bounds; there are binCount of them, or one per physical pixel column, at most 4096
+// (the capacity of histBuffer). HistogramChart.computeBounds sizes the y axis from the same bins:
+// keep histRange and histBins in step with it (charts/experimental/histogram.ts).
 const HIST_UNIFORMS_STRUCT = `struct HistUniforms {
 binCount: u32,
 minValue: f32,
 maxValue: f32,
 _p0: f32,
 };
+fn histRange() -> vec2f {
+let custom = hu.minValue < hu.maxValue;
+return vec2f(select(u.dataMinX, hu.minValue, custom), select(u.dataMaxX, hu.maxValue, custom));
+}
+fn histBins() -> u32 {
+let n = select(u32(u.width), hu.binCount, hu.binCount > 0u);
+return clamp(n, 1u, 4096u);
+}
 `;
 
 export const HIST_CLEAR_SHADER = `${UNIFORM_STRUCT}
@@ -22,33 +34,34 @@ histBuffer[idx] = 0u;
 }
 `;
 
+// One invocation per sample (dispatch2D); gaps and samples outside the binned range are not counted.
 export const HIST_COUNT_SHADER = `${UNIFORM_STRUCT}
 ${HIST_UNIFORMS_STRUCT}
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read> dataX: array<f32>;
 @group(0) @binding(2) var<storage, read_write> histBuffer: array<atomic<u32>>;
 @group(0) @binding(3) var<uniform> hu: HistUniforms;
+@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
 @compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-let idx = id.x;
-let count = u.pointCount;
-if (idx >= count) {
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+let range = allSeries[seriesIdx.index].visibleRange;
+let i = ${SAMPLE_INDEX};
+if (i >= range.y) {
 return;
 }
-let x = dataX[idx];
-let useCustomRange = hu.minValue < hu.maxValue;
-let minVal = select(u.dataMinX, hu.minValue, useCustomRange);
-let maxVal = select(u.dataMaxX, hu.maxValue, useCustomRange);
-let range = maxVal - minVal;
-if (range <= 0.0) {
+let x = dataX[range.x + i];
+let bounds = histRange();
+let minVal = bounds.x;
+let maxVal = bounds.y;
+let span = maxVal - minVal;
+if (x < -1.0e38 || span <= 0.0 || x < minVal || x > maxVal) {
 return;
 }
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
-let binF = (x - minVal) / range * f32(binCount);
-let bin = u32(clamp(binF, 0.0, f32(binCount) - 1.0));
-if (bin < 4096u) {
+// The last bin includes its right edge, so the largest sample of the data extent is counted.
+let binCount = histBins();
+let bin = min(u32((x - minVal) / span * f32(binCount)), binCount - 1u);
 atomicAdd(&histBuffer[bin], 1u);
-}
 }
 `;
 
@@ -60,10 +73,9 @@ ${HIST_UNIFORMS_STRUCT}
 @group(0) @binding(3) var<uniform> hu: HistUniforms;
 @compute @workgroup_size(1)
 fn main() {
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
-let safeBins = min(binCount, 4096u);
+let binCount = histBins();
 var maxVal = 0u;
-for (var i = 0u; i < safeBins; i++) {
+for (var i = 0u; i < binCount; i++) {
 let v = histBuffer[i];
 if (v > maxVal) {
 maxVal = v;
@@ -91,9 +103,9 @@ var out: VertexOutput;
 out.seriesIdx = si.index;
 let colIdx = vi / 6u;
 let vertexType = vi % 6u;
-let binCount = select(u32(u.width), hu.binCount, hu.binCount > 0u);
+let binCount = histBins();
 let maxCount = maxBuffer[0];
-if (colIdx >= binCount || colIdx >= 4096u || maxCount == 0u) {
+if (colIdx >= binCount || maxCount == 0u) {
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
 out.alpha = 0.0;
 return out;
@@ -104,14 +116,13 @@ out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
 out.alpha = 0.0;
 return out;
 }
-let useCustomRange = hu.minValue < hu.maxValue;
-let minVal = select(u.dataMinX, hu.minValue, useCustomRange);
-let maxVal = select(u.dataMaxX, hu.maxValue, useCustomRange);
-let range = maxVal - minVal;
+let bounds = histRange();
+let minVal = bounds.x;
+let range = bounds.y - bounds.x;
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeX = select(viewRangeX, 1.0, viewRangeX < 0.0001);
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
+let safeRangeX = select(viewRangeX, 1.0, viewRangeX <= 0.0);
+let safeRangeY = select(viewRangeY, 1.0, viewRangeY <= 0.0);
 let binLeft = minVal + f32(colIdx) / f32(binCount) * range;
 let binRight = minVal + f32(colIdx + 1u) / f32(binCount) * range;
 let screenLeft = (binLeft - u.viewMinX) / safeRangeX;

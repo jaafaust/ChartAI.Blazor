@@ -1,0 +1,7 @@
+# Test runner settings for `bun test` (`bun run test` adds --isolate: a fresh global per file).
+[test]
+# Only the suites under test/ (src/ has none, node_modules must never be scanned).
+root = "./test"
+# A DOM (happy-dom) plus deterministic fakes for Worker, ResizeObserver, IntersectionObserver,
+# matchMedia, requestAnimationFrame and OffscreenCanvas, installed before any test file loads.
+preload = ["./test/setup/preload.ts"]

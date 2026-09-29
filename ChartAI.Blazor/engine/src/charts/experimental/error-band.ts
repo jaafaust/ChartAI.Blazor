@@ -52,6 +52,7 @@ export const ErrorBandChart: RendererPlugin = {
         { binding: 5, source: "custom-uniforms" },
         { binding: 6, source: "lo-data" },
         { binding: 7, source: "hi-data" },
+        { binding: 8, source: "series-index" },
       ],
     },
     {
@@ -108,6 +109,7 @@ export const ErrorBandChart: RendererPlugin = {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const s of series) {
       for (const x of s.rawX) {
+        if (x == null || x !== x) continue;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
       }

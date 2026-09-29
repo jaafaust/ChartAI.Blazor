@@ -32,7 +32,7 @@ out.seriesIdx = series_idx;
 out.valid = 0.0;
 out.lineNormY = 0.0;
 out.baselineNormY = 0.0;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&lineData));
 if (vi >= maxCols * 2u) {
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
 return out;
@@ -41,19 +41,17 @@ let col = vi / 2u;
 let onLine = (vi % 2u) == 0u;
 let d = lineData[col];
 let viewRangeY = u.viewMaxY - u.viewMinY;
-let normBaseline = select(0.0, (bau.baseline - u.viewMinY) / viewRangeY, viewRangeY > 0.0001);
+let normBaseline = select(0.0, (bau.baseline - u.viewMinY) / viewRangeY, viewRangeY > 0.0);
 let baselineScreenY = 1.0 - normBaseline;
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let leftBound = select(0.0, clamp((u.dataMinX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-let rightBound = select(1.0, clamp((u.dataMaxX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-var sx = clamp(d.screenX, leftBound, rightBound);
+// The columns' x are sample positions already (see the line compute shader): no clamp to the bounds.
+var sx = d.screenX;
 let midScreenY = (d.minScreenY + d.maxScreenY) * 0.5;
 let lineNormY = 1.0 - midScreenY;
 var py = select(baselineScreenY, midScreenY, onLine);
 if (d.valid < 0.5 && vi > 0u) {
 let prevCol = (vi - 1u) / 2u;
 let pd = lineData[prevCol];
-sx = clamp(pd.screenX, leftBound, rightBound);
+sx = pd.screenX;
 let prevMidScreenY = (pd.minScreenY + pd.maxScreenY) * 0.5;
 py = select(baselineScreenY, prevMidScreenY, (vi - 1u) % 2u == 0u);
 }

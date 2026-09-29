@@ -1,8 +1,9 @@
 import type { ChartPlugin, ChartConfig, InternalChart } from "../../types.ts";
 import { ChartManager } from "../../chart-library.ts";
 import { DEFAULT_FONT } from "../labels.ts";
-import { MARGIN, chartMargin } from "../shared.ts";
+import { MARGIN, chartMargin, clickFollowsDrag } from "../shared.ts";
 import { dataToScreen, screenToData } from "../coords.ts";
+import { scheduleDraw } from "../redraw.ts";
 
 export type RulerAxis = "x" | "y" | "both";
 
@@ -38,16 +39,39 @@ interface RulerState {
   cursorDataX: number;
   cursorDataY: number;
   active: boolean;
-  justToggledButton: boolean;
   abort: AbortController;
   button: HTMLButtonElement;
   clearBtn: HTMLButtonElement;
   wrapper: HTMLDivElement;
+  // What afterDraw last applied to the wrapper (position, theme), so it writes only changes.
+  wrapperKey: string;
 }
 
 const states = new WeakMap<InternalChart, RulerState>();
 
 const ENDPOINT_HIT_PX = 12;
+
+// The last ruler (topmost first) with an endpoint within ENDPOINT_HIT_PX of (sx, sy), or -1.
+function rulerAt(
+  state: RulerState,
+  chart: InternalChart,
+  sx: number,
+  sy: number,
+  w: number,
+  h: number,
+): number {
+  for (let i = state.rulers.length - 1; i >= 0; i--) {
+    const ruler = state.rulers[i];
+    const sa = dataToScreen(ruler.a.dataX, ruler.a.dataY, chart, w, h);
+    const sb = dataToScreen(ruler.b.dataX, ruler.b.dataY, chart, w, h);
+    if (
+      Math.hypot(sa.x - sx, sa.y - sy) <= ENDPOINT_HIT_PX ||
+      Math.hypot(sb.x - sx, sb.y - sy) <= ENDPOINT_HIT_PX
+    )
+      return i;
+  }
+  return -1;
+}
 
 function showClearBtn(btn: HTMLButtonElement, visible: boolean) {
   const isVisible = btn.hasAttribute("data-visible");
@@ -348,6 +372,9 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
     wrapper.className = "chart-ruler-wrapper";
     setWrapperPosition(wrapper, cfg.rulerPosition, chart);
     applyTheme(wrapper, dark);
+    // The buttons act on pointerdown; the click that follows stays with them rather than
+    // reaching the chart as a ruler point, a tooltip pin or a click on the host.
+    wrapper.addEventListener("click", (e) => e.stopPropagation(), { signal: ac.signal });
 
     const button = document.createElement("button");
     button.type = "button";
@@ -371,11 +398,11 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
       cursorDataX: 0,
       cursorDataY: 0,
       active: false,
-      justToggledButton: false,
       abort: ac,
       button,
       clearBtn,
       wrapper,
+      wrapperKey: "",
     };
     states.set(chart, state);
 
@@ -387,10 +414,9 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
         e.preventDefault();
         state.active = !state.active;
         if (!state.active) state.pending = null;
-        state.justToggledButton = true;
         if (state.active) button.dataset.active = "";
         else delete button.dataset.active;
-        ChartManager.drawChart(chart);
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
@@ -404,18 +430,7 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
         clearBtn.style.transform = "scale(0.78)";
         state.rulers = [];
         state.pending = null;
-        state.justToggledButton = true;
-        ChartManager.drawChart(chart);
-      },
-      { signal: ac.signal },
-    );
-
-    clearBtn.addEventListener(
-      "click",
-      (e) => {
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        e.preventDefault();
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
@@ -423,6 +438,7 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
     el.addEventListener(
       "mousemove",
       (e) => {
+        if (!state.active && state.pending === null) return;
         const r = el.getBoundingClientRect();
         const { x, y } = screenToData(
           e.clientX - r.left,
@@ -433,10 +449,7 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
         );
         state.cursorDataX = x;
         state.cursorDataY = y;
-        if (state.active || state.pending !== null) {
-          ChartManager.drawChart(chart);
-        }
-        e.preventDefault();
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
@@ -445,11 +458,8 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
       "click",
       (e) => {
         if (!state.active) return;
-        if (state.justToggledButton) {
-          state.justToggledButton = false;
-          return;
-        }
-        if (chart.dragging) return;
+        // The click that ends a pan is not a point.
+        if (chart.dragging || clickFollowsDrag(chart)) return;
         e.preventDefault();
 
         const r = el.getBoundingClientRect();
@@ -463,29 +473,12 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
           r.height,
         );
 
-        for (let i = state.rulers.length - 1; i >= 0; i--) {
-          const ruler = state.rulers[i];
-          const sa = dataToScreen(
-            ruler.a.dataX,
-            ruler.a.dataY,
-            chart,
-            r.width,
-            r.height,
-          );
-          const sb = dataToScreen(
-            ruler.b.dataX,
-            ruler.b.dataY,
-            chart,
-            r.width,
-            r.height,
-          );
-          const dA = Math.hypot(sa.x - sx, sa.y - sy);
-          const dB = Math.hypot(sb.x - sx, sb.y - sy);
-          if (dA <= ENDPOINT_HIT_PX || dB <= ENDPOINT_HIT_PX) {
-            state.rulers.splice(i, 1);
-            ChartManager.drawChart(chart);
-            return;
-          }
+        // A click on an endpoint removes that ruler.
+        const hit = rulerAt(state, chart, sx, sy, r.width, r.height);
+        if (hit !== -1) {
+          state.rulers.splice(hit, 1);
+          scheduleDraw(chart);
+          return;
         }
 
         if (state.pending === null) {
@@ -496,51 +489,28 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
           if (state.rulers.length >= rulerMax) state.rulers.shift();
           state.rulers.push({ a: state.pending, b: { dataX, dataY } });
           state.pending = null;
-          ChartManager.drawChart(chart);
         }
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
 
+    // While the tool is on, a right-click cancels the ruler being drawn, or removes the ruler
+    // whose endpoint it hits. Anywhere else, and with the tool off, it is the page's.
     el.addEventListener(
       "contextmenu",
       (e) => {
-        e.preventDefault();
+        if (!state.active) return;
         if (state.pending !== null) {
           state.pending = null;
         } else {
           const r = el.getBoundingClientRect();
-          const sx = e.clientX - r.left;
-          const sy = e.clientY - r.top;
-          let bestIdx = -1;
-          let bestDist = Infinity;
-          for (let i = 0; i < state.rulers.length; i++) {
-            const ruler = state.rulers[i];
-            const sa = dataToScreen(
-              ruler.a.dataX,
-              ruler.a.dataY,
-              chart,
-              r.width,
-              r.height,
-            );
-            const sb = dataToScreen(
-              ruler.b.dataX,
-              ruler.b.dataY,
-              chart,
-              r.width,
-              r.height,
-            );
-            const dA = Math.hypot(sa.x - sx, sa.y - sy);
-            const dB = Math.hypot(sb.x - sx, sb.y - sy);
-            const d = Math.min(dA, dB);
-            if (d < bestDist) {
-              bestDist = d;
-              bestIdx = i;
-            }
-          }
-          if (bestIdx !== -1) state.rulers.splice(bestIdx, 1);
+          const hit = rulerAt(state, chart, e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+          if (hit === -1) return;
+          state.rulers.splice(hit, 1);
         }
-        ChartManager.drawChart(chart);
+        e.preventDefault();
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
@@ -550,7 +520,7 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
       (e) => {
         if (e.key === "Escape" && state.active) {
           state.pending = null;
-          ChartManager.drawChart(chart);
+          scheduleDraw(chart);
         }
       },
       { signal: ac.signal },
@@ -572,10 +542,15 @@ export const rulerPlugin: ChartPlugin<RulerConfig> = {
     const formatY = cfg.formatY ?? String;
     const fontFamily = cfg.fontFamily ?? DEFAULT_FONT;
 
-    setWrapperPosition(state.wrapper, cfg.rulerPosition, chart);
-    applyTheme(state.wrapper, dark);
-    if (state.active) state.button.dataset.active = "";
-    else delete state.button.dataset.active;
+    // The wrapper's position and theme are rewritten only when they change: style writes on
+    // every draw made each following mousemove pay for a layout (getBoundingClientRect).
+    const m = chartMargin(chart);
+    const wrapperKey = `${cfg.rulerPosition}|${m.top}|${m.right}|${m.bottom}|${m.left}|${dark}`;
+    if (wrapperKey !== state.wrapperKey) {
+      state.wrapperKey = wrapperKey;
+      setWrapperPosition(state.wrapper, cfg.rulerPosition, chart);
+      applyTheme(state.wrapper, dark);
+    }
     showClearBtn(state.clearBtn, state.rulers.length > 0);
 
     ctx.save();

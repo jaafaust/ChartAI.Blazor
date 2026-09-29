@@ -24,7 +24,7 @@ struct VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&cols));
 let seg = vi / 6u;
 if (seg + 1u >= maxCols) { return out; }
 let d0 = cols[seg];
@@ -71,7 +71,7 @@ struct VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&cols));
 let seg = vi / 6u;
 if (seg + 1u >= maxCols) { return out; }
 let d0 = cols[seg];

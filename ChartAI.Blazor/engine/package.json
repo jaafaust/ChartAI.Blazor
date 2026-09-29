@@ -5,9 +5,12 @@
   "description": "TypeScript sources of the chartai WebGPU chart engine, bundled by build.ts into ../wwwroot/chartai.js",
   "scripts": {
     "build": "bun run build.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test --isolate"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.14.5",
+    "@webgpu/types": "^0.1.74",
     "typescript": "^5.9.3"
   }
 }

@@ -124,6 +124,8 @@ export const annotationsPlugin: ChartPlugin<AnnotationsConfig> = {
   // stops there: it reaches neither the zoom plugin nor the host's own click handlers. The
   // handlers sit on the host rather than the interaction layer, which puts them after the zoom
   // plugin's, so the pointer cursor set here outlives the cursor that plugin sets on every move.
+  // The click handler runs in the capture phase, ahead of the handlers on the interaction layer
+  // (ruler, tooltip pin), so a click on a pill is not also a ruler point or a pin.
   install(chart, el) {
     const ac = new AbortController();
     const st = { abort: ac, downX: 0, downY: 0 };
@@ -146,7 +148,7 @@ export const annotationsPlugin: ChartPlugin<AnnotationsConfig> = {
       (e) => {
         if (chart.dragging) return;
         const { x, y } = local(e);
-        if (pillAt(chart, x, y)) el.style.cursor = "pointer";
+        if (pillAt(chart, x, y) && el.style.cursor !== "pointer") el.style.cursor = "pointer";
       },
       { signal: ac.signal },
     );
@@ -155,6 +157,10 @@ export const annotationsPlugin: ChartPlugin<AnnotationsConfig> = {
       (e) => {
         // A drag that ends on a pill is not a click on it.
         if (Math.hypot(e.clientX - st.downX, e.clientY - st.downY) > 4) return;
+        // Pills are drawn on the chart canvas: a click on an overlay control above one (the
+        // legend, the stats panel) or on a canvas outside the chart area is not for them.
+        const t = e.target;
+        if (!(t instanceof HTMLCanvasElement) || t.parentElement !== el) return;
         const { x, y } = local(e);
         const ann = pillAt(chart, x, y);
         if (!ann) return;
@@ -168,7 +174,7 @@ export const annotationsPlugin: ChartPlugin<AnnotationsConfig> = {
           }),
         );
       },
-      { signal: ac.signal },
+      { capture: true, signal: ac.signal },
     );
   },
 

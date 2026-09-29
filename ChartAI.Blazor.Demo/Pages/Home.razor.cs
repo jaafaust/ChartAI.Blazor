@@ -70,7 +70,11 @@ public partial class Home
         if (!firstRender) return;
         _isDark = await JS.InvokeAsync<bool>("chartaiDemo.isDark");
         StateHasChanged();
-        StartLive();
+
+        // Tick only once the live charts are up; without WebGPU they never are.
+        var ready = await Task.WhenAll(new[] { _liveLine, _liveScatter, _liveLine2 }
+            .Select(c => c?.ChartRef?.Ready ?? Task.FromResult(false)));
+        if (ready.Any(r => r) && !_disposed) StartLive();
     }
 
     private async Task<IJSObjectReference> EnsureModuleAsync()
@@ -600,13 +604,16 @@ public partial class Home
     private int _liveSpeed = 1;
     private bool _liveAccumulate;
     private Timer? _liveTimer;
+    private bool _liveTicking;
+    private bool _disposed;
     private string? _liveViewInfo;
 
     private static ChartConfig LiveConfig(ChartType type)
     {
         var c = Cfg(type, AxisFormat.Index, AxisFormat.Price);
-        // Buffers for the window plus the column appended before the oldest one is dropped.
-        c.Capacity = LiveWindow + 8;
+        // Room for twice the window: a dropped column is only skipped, and the columns are moved
+        // back to the start of the buffers (one full-window upload) once per window.
+        c.Capacity = 2 * LiveWindow;
         return c;
     }
 
@@ -629,6 +636,7 @@ public partial class Home
 
     private void StartLive()
     {
+        if (_disposed) return;
         _liveTimer?.Dispose();
         int interval = Math.Max(16, 1000 / _liveSpeed);
         _liveTimer = new Timer(_ => _ = InvokeAsync(TickLiveAsync), null, interval, interval);
@@ -637,7 +645,7 @@ public partial class Home
     private void SetSpeed(int speed)
     {
         _liveSpeed = speed;
-        StartLive();
+        if (_liveTimer is not null) StartLive();
     }
 
     private void OnAccumulateChanged(ChangeEventArgs e) => _liveAccumulate = (bool)(e.Value ?? false);
@@ -649,6 +657,15 @@ public partial class Home
     }
 
     private async Task TickLiveAsync()
+    {
+        // A tick that is still sending when the timer fires again is not overtaken by the next.
+        if (_liveTicking || _disposed) return;
+        _liveTicking = true;
+        try { await TickLiveCoreAsync(); }
+        finally { _liveTicking = false; }
+    }
+
+    private async Task TickLiveCoreAsync()
     {
         double nextX = _liveDataX.Count > 0 ? _liveDataX[^1] + 1 : 0;
         double l1 = _liveDataY1.Count > 0 ? _liveDataY1[^1] : 50;
@@ -687,7 +704,7 @@ public partial class Home
     {
         var chart = card?.ChartRef;
         if (chart is null) return Task.CompletedTask;
-        double lo = y.Min(), hi = y.Max();
+        var (lo, hi) = FiniteRange(y);
         double pad = (hi - lo) * 0.1 + 0.01;
         double x0 = _liveDataX[0], x1 = _liveDataX[^1];
         double xpad = (x1 - x0) * 0.02 + 1;
@@ -700,12 +717,29 @@ public partial class Home
         });
     }
 
+    // The range of the samples that are there: y.Min() is NaN as soon as one gap (NaN) is in
+    // the window. Falls back to 0..1 while there is none.
+    private static (double Lo, double Hi) FiniteRange(List<double> values)
+    {
+        double lo = double.PositiveInfinity, hi = double.NegativeInfinity;
+        foreach (var v in values)
+        {
+            if (!double.IsFinite(v)) continue;
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+        }
+        return lo <= hi ? (lo, hi) : (0, 1);
+    }
+
     // ─── Big data ──────────────────────────────────────────────────────────
     private int _bigDataCount = 1_000_000;
     private bool _bigDataBusy;
     private string _bigDataStats = "Ready";
     private string _bigDataLineInfo = "Not generated";
     private string _bigDataScatterInfo = "Not generated";
+    // Built once: a Config built inline in the markup is a new instance on every render.
+    private readonly ChartConfig _bigDataLineCfg = Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price);
+    private readonly ChartConfig _bigDataScatterCfg = Cfg(ChartType.Scatter, AxisFormat.Index, AxisFormat.Number);
     private ChartSeries[] _bigDataLineSeries = Array.Empty<ChartSeries>();
     private ChartSeries[] _bigDataScatterSeries = Array.Empty<ChartSeries>();
 
@@ -738,6 +772,7 @@ public partial class Home
     private string _bigSeriesStats = "Ready";
     private string _bigSeriesInfo = "Not generated";
     private ChartSeries[] _bigSeriesSeries = Array.Empty<ChartSeries>();
+    private readonly ChartConfig _bigSeriesCfg = Cfg(ChartType.Line, AxisFormat.Date, AxisFormat.Price);
 
     private async Task GenerateBigSeries()
     {
@@ -793,7 +828,9 @@ public partial class Home
         _interactiveConfig.Annotations = new List<Annotation>(_interactiveAnnotations);
         _newAnnValue = null;
         _newAnnLabel = null;
-        if (_interactiveChart is not null) await _interactiveChart.RefreshAsync();
+        // The config was changed in place; the chart would also notice when this page renders
+        // after the click, RefreshConfigAsync sends it right away (and leaves the data alone).
+        if (_interactiveChart is not null) await _interactiveChart.RefreshConfigAsync();
     }
 
     private async Task ClearAnnotations()
@@ -801,7 +838,7 @@ public partial class Home
         _interactiveAnnotations.Clear();
         _interactiveConfig.Annotations = new List<Annotation>();
         _clickedAnnotation = null;
-        if (_interactiveChart is not null) await _interactiveChart.RefreshAsync();
+        if (_interactiveChart is not null) await _interactiveChart.RefreshConfigAsync();
     }
 
     private void OnAnnotationClicked(string? id)
@@ -812,6 +849,7 @@ public partial class Home
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         _liveTimer?.Dispose();
         if (_module is not null)
         {

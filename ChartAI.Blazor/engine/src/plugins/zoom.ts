@@ -1,9 +1,30 @@
 import type { ChartPlugin, InternalChart, ZoomMode } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
-import { chartMargin, hasRightAxes } from "./shared.ts";
+import { chartMargin, floatZoomLimit, hasRightAxes } from "./shared.ts";
+import { commitView } from "./redraw.ts";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 10_000_000;
+
+// The zoom an axis may go to from `current`: MIN_ZOOM..MAX_ZOOM, and no deeper than keeps the
+// visible span well above the float64 spacing of the values in view (floatZoomLimit), which
+// the tick labels and the hover maths need. Zooming out of a view that is already deeper, after
+// the data changed, stays possible.
+function limitZoom(next: number, current: number, lo: number, hi: number, anchor: number): number {
+  const cap = Math.min(MAX_ZOOM, floatZoomLimit(lo, hi, anchor));
+  if (next > cap) next = Math.max(cap, Math.min(current, next));
+  return Math.max(MIN_ZOOM, next);
+}
+
+// The touch gestures the page keeps: all of them with zoomMode "none", so a page of static charts
+// scrolls under a finger, and the pan along the axis the chart does not move with "x-only" and
+// "y-only". On touch the axis gutters then lose that direction; with a mouse they still pan.
+function touchActionFor(mode: ZoomMode, original: string): string {
+  if (mode === "none") return original;
+  if (mode === "x-only") return "pan-y";
+  if (mode === "y-only") return "pan-x";
+  return "none";
+}
 
 export interface ZoomConfig {
   zoomMode?: ZoomMode;
@@ -22,8 +43,9 @@ export interface ZoomPluginOptions {
 
 // Differences from upstream chartai's zoom plugin: no pan momentum, `chart.dragging` stays true
 // for as long as a pointer is down (and briefly after a wheel step), a drag stamps
-// `chart.lastDragEndTime`, the axis gutters pan their axis one-to-one, and the cursor shows
-// what a drag would do.
+// `chart.lastDragEndTime`, the axis gutters pan their axis one-to-one, the cursor shows what a
+// drag would do, and zoomMode "none" leaves the wheel and touch scrolling over the plot to the
+// page. Every view change goes through ChartManager.commitView.
 export function zoomPlugin(
   opts: ZoomPluginOptions = {},
 ): ChartPlugin<ZoomConfig> {
@@ -37,6 +59,8 @@ export function zoomPlugin(
     originalUserSelect: string;
     originalWebkitUserSelect: string;
     el: HTMLElement;
+    // The touch-action last applied, so a draw writes the style only when zoomMode changed.
+    touchAction: string;
   }
 
   const state = new WeakMap<InternalChart, ZoomState>();
@@ -48,7 +72,8 @@ export function zoomPlugin(
       const originalTouchAction = el.style.touchAction;
       const originalUserSelect = el.style.userSelect;
       const originalWebkitUserSelect = (el.style as any).webkitUserSelect;
-      el.style.touchAction = "none";
+      const touchAction = touchActionFor(chart.config.zoomMode ?? "both", originalTouchAction);
+      el.style.touchAction = touchAction;
       el.style.userSelect = "none";
       (el.style as any).webkitUserSelect = "none";
 
@@ -64,6 +89,7 @@ export function zoomPlugin(
         originalUserSelect,
         originalWebkitUserSelect,
         el,
+        touchAction,
       };
 
       const mode = () => chart.config.zoomMode ?? "both";
@@ -110,11 +136,7 @@ export function zoomPlugin(
         return a === "x" ? "ew-resize" : a === "y" ? "ns-resize" : "";
       };
 
-      const sendView = () => {
-        mgr.requestRender(chart.id);
-        mgr.drawChart(chart);
-        if (mgr.syncViews) mgr.syncAllViews(chart);
-      };
+      const sendView = () => commitView(chart);
 
       el.addEventListener(
         "pointerdown",
@@ -198,7 +220,12 @@ export function zoomPlugin(
           }
 
           if (pointers.length === 0) {
-            if (e.pointerType !== "touch") el.style.cursor = hoverCursor(e);
+            if (e.pointerType !== "touch") {
+              // Written only on a change: a style write per move makes the next layout read
+              // (every hover handler's getBoundingClientRect) recompute styles.
+              const cursor = hoverCursor(e);
+              if (el.style.cursor !== cursor) el.style.cursor = cursor;
+            }
             return;
           }
 
@@ -253,14 +280,15 @@ export function zoomPlugin(
               lastTime = now;
 
               const m = mode();
-              if (m !== "none" && (m === "both" || m === "x-only"))
-                chart.view.panX -= dx / chart.view.zoomX;
-              if (m !== "none" && (m === "both" || m === "y-only"))
-                chart.view.panY += dy / chart.view.zoomY;
+              const panX = m === "both" || m === "x-only";
+              const panY = m === "both" || m === "y-only";
+              if (panX) chart.view.panX -= dx / chart.view.zoomX;
+              if (panY) chart.view.panY += dy / chart.view.zoomY;
 
               lastX = e.clientX;
               lastY = e.clientY;
-              sendView();
+              // zoomMode "none" leaves the view alone, so there is nothing to commit.
+              if (panX || panY) sendView();
             }
           } else if (pointers.length === 2 && gestureState === "pinch") {
             if (e.pointerType === "touch") {
@@ -285,34 +313,46 @@ export function zoomPlugin(
             const scale = Math.exp(pixelChange / 280);
 
             const pm = mode();
-            if (pm !== "none" && (pm === "both" || pm === "x-only")) {
-              const newZoomX = Math.max(
-                MIN_ZOOM,
-                Math.min(MAX_ZOOM, pinchStartZoomX * scale),
-              );
+            const b = chart.bounds;
+            const pinchX = pm === "both" || pm === "x-only";
+            const pinchY = pm === "both" || pm === "y-only";
+            if (pinchX) {
               const fx =
                 chart.view.panX + currentPinchCenterX / chart.view.zoomX;
+              const newZoomX = limitZoom(
+                pinchStartZoomX * scale,
+                chart.view.zoomX,
+                b.minX,
+                b.maxX,
+                b.minX + fx * (b.maxX - b.minX),
+              );
               chart.view.zoomX = newZoomX;
               chart.view.panX = fx - currentPinchCenterX / newZoomX;
             }
-            if (pm !== "none" && (pm === "both" || pm === "y-only")) {
-              const newZoomY = Math.max(
-                MIN_ZOOM,
-                Math.min(MAX_ZOOM, pinchStartZoomY * scale),
-              );
+            if (pinchY) {
               const fy =
                 chart.view.panY + currentPinchCenterY / chart.view.zoomY;
+              const newZoomY = limitZoom(
+                pinchStartZoomY * scale,
+                chart.view.zoomY,
+                b.minY,
+                b.maxY,
+                b.minY + fy * (b.maxY - b.minY),
+              );
               chart.view.zoomY = newZoomY;
               chart.view.panY = fy - currentPinchCenterY / newZoomY;
             }
 
-            sendView();
+            if (pinchX || pinchY) sendView();
           }
         },
         { passive: false, signal: ac.signal },
       );
 
       const endPointer = (e: PointerEvent) => {
+        // A press another plugin claimed (a legend row, the minimap) was never tracked here;
+        // its release must not count as a tap (a double tap resets the view) or a drag.
+        if (!pointers.some((p) => p.pointerId === e.pointerId)) return;
         pointers = pointers.filter((p) => p.pointerId !== e.pointerId);
         try {
           el.releasePointerCapture(e.pointerId);
@@ -372,8 +412,6 @@ export function zoomPlugin(
       el.addEventListener(
         "wheel",
         (e) => {
-          e.preventDefault();
-
           const rect = el.getBoundingClientRect();
           const localX = e.clientX - rect.left;
           const localY = e.clientY - rect.top;
@@ -401,20 +439,31 @@ export function zoomPlugin(
             zoomY = wm === "both" || wm === "y-only";
           }
 
+          // zoomMode "none" over the plot: the wheel is the page's, so it scrolls.
+          if (!zoomX && !zoomY) return;
+          e.preventDefault();
+
+          const b = chart.bounds;
           if (zoomX) {
             const fx = chart.view.panX + mx / chart.view.zoomX;
-            chart.view.zoomX = Math.max(
-              MIN_ZOOM,
-              Math.min(MAX_ZOOM, chart.view.zoomX * scale),
+            chart.view.zoomX = limitZoom(
+              chart.view.zoomX * scale,
+              chart.view.zoomX,
+              b.minX,
+              b.maxX,
+              b.minX + fx * (b.maxX - b.minX),
             );
             chart.view.panX = fx - mx / chart.view.zoomX;
           }
 
           if (zoomY) {
             const fy = chart.view.panY + my / chart.view.zoomY;
-            chart.view.zoomY = Math.max(
-              MIN_ZOOM,
-              Math.min(MAX_ZOOM, chart.view.zoomY * scale),
+            chart.view.zoomY = limitZoom(
+              chart.view.zoomY * scale,
+              chart.view.zoomY,
+              b.minY,
+              b.maxY,
+              b.minY + fy * (b.maxY - b.minY),
             );
             chart.view.panY = fy - my / chart.view.zoomY;
           }
@@ -426,13 +475,21 @@ export function zoomPlugin(
             chart.dragging = false;
           }, 150);
 
-          if (zoomX || zoomY) sendView();
+          sendView();
         },
         { passive: false, signal: ac.signal },
       );
     },
 
     resetView(chart) {},
+
+    // configure() redraws the chart, so a changed zoomMode reaches touch-action here.
+    afterDraw(_, chart) {
+      const s = state.get(chart);
+      if (!s) return;
+      const ta = touchActionFor(chart.config.zoomMode ?? "both", s.originalTouchAction);
+      if (ta !== s.touchAction) s.el.style.touchAction = s.touchAction = ta;
+    },
 
     uninstall(chart) {
       const s = state.get(chart);

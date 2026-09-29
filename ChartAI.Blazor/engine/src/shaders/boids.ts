@@ -1,4 +1,4 @@
-import { UNIFORM_STRUCT, COMPUTE_WG } from "./shared.ts";
+import { UNIFORM_STRUCT, COMPUTE_WG, SAMPLE_INDEX } from "./shared.ts";
 
 const BOID_STATE = `struct BoidState { pos: vec2f, vel: vec2f, species: u32, _pad: u32 }`;
 
@@ -58,17 +58,19 @@ ${BOID_STATE}
 @group(0) @binding(2) var<storage, read> dataY: array<f32>;
 @group(0) @binding(3) var<storage, read_write> boidsState: array<BoidState>;
 @group(0) @binding(4) var<uniform> seriesIdx: SeriesIndex;
+@group(0) @binding(5) var<storage, read> allSeries: array<SeriesInfo>;
 fn hash2(p: vec2f) -> vec2f {
   let q = vec2f(dot(p, vec2f(127.1, 311.7)), dot(p, vec2f(269.5, 183.3)));
   return fract(sin(q) * 43758.5453);
 }
 @compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+  let i = ${SAMPLE_INDEX};
+  let count = allSeries[seriesIdx.index].visibleRange.y;
+  if (i >= count) { return; }
   let b = boidsState[i];
   if (b.vel.x == 0.0 && b.vel.y == 0.0) {
-    let seed = f32(seriesIdx.index * u.pointCount + i);
+    let seed = f32(seriesIdx.index * count + i);
     let rPos = hash2(vec2f(seed * 0.1, 1.7));
     let rVel = hash2(vec2f(seed * 0.1, 0.5));
     let a = rVel.x * 6.28318;
@@ -101,10 +103,12 @@ ${GRID_HELPERS}
 @group(0) @binding(1) var<storage, read> boidsState: array<BoidState>;
 @group(0) @binding(2) var<storage, read_write> gridCount: array<atomic<u32>>;
 @group(0) @binding(3) var<storage, read_write> gridBoids: array<u32>;
+@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
 @compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+  let i = ${SAMPLE_INDEX};
+  if (i >= allSeries[seriesIdx.index].visibleRange.y) { return; }
   let gp   = gridParams(u.viewMinX, u.viewMaxX, u.viewMinY, u.viewMaxY);
   let gc   = boidToCell(boidsState[i].pos, gp);
   let cell = u32(gc.y * i32(GRID_W) + gc.x);
@@ -124,11 +128,12 @@ ${GRID_HELPERS}
 @group(0) @binding(2) var<uniform> seriesIdx: SeriesIndex;
 @group(0) @binding(3) var<storage, read> gridCount: array<u32>;
 @group(0) @binding(4) var<storage, read> gridBoids: array<u32>;
+@group(0) @binding(5) var<storage, read> allSeries: array<SeriesInfo>;
 fn hash2(p: vec2f) -> vec2f { let q = vec2f(dot(p, vec2f(127.1, 311.7)), dot(p, vec2f(269.5, 183.3))); return fract(sin(q) * 43758.5453); }
 @compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let i = id.x;
-  if (i >= u.pointCount) { return; }
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+  let i = ${SAMPLE_INDEX};
+  if (i >= allSeries[seriesIdx.index].visibleRange.y) { return; }
   let me = boidsState[i];
 
   // Speed scales up when zoomed out, floor at MAX_SPD when zoomed in.
@@ -246,13 +251,13 @@ struct VertexOutput { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @lo
   var out: VertexOutput;
   out.uv = vec2f(0.0); out.color = vec4f(0.0); out.pos = vec4f(0.0, 0.0, 2.0, 1.0);
   let boidIdx = vi / 6u;
-  if (boidIdx >= u.pointCount) { return out; }
+  let series = allSeries[seriesIdx.index];
+  if (boidIdx >= series.visibleRange.y) { return out; }
   let vtxInQuad = vi % 6u;
   let b = boidsState[boidIdx];
-  let series = allSeries[seriesIdx.index];
   let rx = u.viewMaxX - u.viewMinX;
   let ry = u.viewMaxY - u.viewMinY;
-  if (rx < 1e-5 || ry < 1e-5) { return out; }
+  if (rx <= 0.0 || ry <= 0.0) { return out; }
   let normX = (b.pos.x - u.viewMinX) / rx;
   let normY = (b.pos.y - u.viewMinY) / ry;
   let clipX = normX * 2.0 - 1.0;

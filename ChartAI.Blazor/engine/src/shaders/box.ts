@@ -3,6 +3,7 @@ import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
 // Layout of the bar chart's custom uniforms, in the order charts/bar.ts declares them.
 const BAR_UNIFORMS = `struct BarUniforms { maxSamplesPerPixel: u32, barOpacity: f32, _p2: u32, _p3: u32 };`;
 
+// A sample of -3e38 (GPU_GAP in chart-library.ts) is a missing bar: nothing is drawn for it.
 export const BOX_COMPUTE_SHADER = `${UNIFORM_STRUCT}
 ${BAR_UNIFORMS}
 struct BarData {
@@ -19,15 +20,15 @@ barWidth: f32,
 @group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
 @group(0) @binding(6) var<uniform> bu: BarUniforms;
 ${BINARY_SEARCH}
-fn barHalfWidth(idx: u32, count: u32) -> f32 {
-if (count <= 1u) {
+fn barHalfWidth(idx: u32, seriesStart: u32, seriesEnd: u32) -> f32 {
+if (seriesEnd - seriesStart <= 1u) {
 return (u.viewMaxX - u.viewMinX) * 0.4;
 }
 var spacing: f32;
-if (idx == 0u) {
-spacing = dataX[1u] - dataX[0u];
-} else if (idx >= count - 1u) {
-spacing = dataX[count - 1u] - dataX[count - 2u];
+if (idx == seriesStart) {
+spacing = dataX[seriesStart + 1u] - dataX[seriesStart];
+} else if (idx + 1u >= seriesEnd) {
+spacing = dataX[seriesEnd - 1u] - dataX[seriesEnd - 2u];
 } else {
 spacing = min(dataX[idx + 1u] - dataX[idx], dataX[idx] - dataX[idx - 1u]);
 }
@@ -37,26 +38,25 @@ return (spacing * 0.4) / f32(seriesCount);
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
 let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
-}
+let maxCols = min(u32(u.width), arrayLength(&barData));
+if (outputIdx >= maxCols) {
 return;
 }
+// This series' samples: [seriesStart, seriesEnd) of its buffers.
+let range = allSeries[seriesIdx.index].visibleRange;
+let seriesStart = range.x;
+let seriesEnd = range.x + range.y;
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
+if (range.y == 0u || viewRangeX <= 0.0 || viewRangeY <= 0.0) {
 barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
 return;
 }
 let relPx = f32(outputIdx);
 let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
 let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
+let startIdx = lowerBound(pixelMinX, seriesStart, seriesEnd);
+let endIdx = lowerBound(pixelMaxX, startIdx, seriesEnd);
 let centerX = (pixelMinX + pixelMaxX) * 0.5;
 let onePixel = 1.0 / u.width;
 if (startIdx >= endIdx) {
@@ -65,19 +65,19 @@ var bestX: f32 = 0.0;
 var bestY: f32 = 0.0;
 var bestHW: f32 = 0.0;
 var bestDist: f32 = 1e10;
-if (startIdx < count) {
+if (startIdx < seriesEnd && dataY[startIdx] > -1.0e38) {
 let bx = dataX[startIdx];
-let hw = barHalfWidth(startIdx, count);
+let hw = barHalfWidth(startIdx, seriesStart, seriesEnd);
 if (pixelMinX < bx + hw && pixelMaxX > bx - hw) {
 let d = abs(bx - centerX);
 bestX = bx; bestY = dataY[startIdx]; bestHW = hw; bestDist = d;
 hit = true;
 }
 }
-if (startIdx > 0u) {
+if (startIdx > seriesStart && dataY[startIdx - 1u] > -1.0e38) {
 let prev = startIdx - 1u;
 let bx = dataX[prev];
-let hw = barHalfWidth(prev, count);
+let hw = barHalfWidth(prev, seriesStart, seriesEnd);
 if (pixelMinX < bx + hw && pixelMaxX > bx - hw) {
 let d = abs(bx - centerX);
 if (d < bestDist) {
@@ -110,31 +110,42 @@ let bw = max(fullWidth - gapSize, onePixel);
 barData[outputIdx] = BarData(normX, bestY, bestY, bw);
 return;
 }
-var dataMinY = dataY[startIdx];
-var dataMaxY = dataY[startIdx];
+// Several samples fall into this column: one bar spanning their range, gaps left out.
+var dataMinY = 3.0e38;
+var dataMaxY = -3.0e38;
 let rangeCount = endIdx - startIdx;
 let maxSamples = bu.maxSamplesPerPixel;
-if (maxSamples > 0u && rangeCount > maxSamples) {
+if (maxSamples > 1u && rangeCount > maxSamples) {
 let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
 for (var s = 0u; s < maxSamples; s++) {
 let idx = startIdx + u32(f32(s) * stride);
 if (idx < endIdx) {
 let y = dataY[idx];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
+}
 }
 }
 let lastY = dataY[endIdx - 1u];
+if (lastY > -1.0e38) {
 dataMinY = min(dataMinY, lastY);
 dataMaxY = max(dataMaxY, lastY);
+}
 } else {
-for (var i = startIdx + 1u; i < endIdx; i++) {
+for (var i = startIdx; i < endIdx; i++) {
 let y = dataY[i];
+if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
 }
 }
-let hw = barHalfWidth(startIdx, count);
+}
+if (dataMaxY < dataMinY) {
+barData[outputIdx] = BarData(0.0, 0.0, 0.0, 0.0);
+return;
+}
+let hw = barHalfWidth(startIdx, seriesStart, seriesEnd);
 let fullWidth = hw * 2.0 / viewRangeX;
 let gapSize = max(onePixel, fullWidth * 0.05);
 let bw = max(fullWidth - gapSize, onePixel);
@@ -166,7 +177,7 @@ struct VertexOutput {
 @vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&barData));
 let colIdx = vi / 6u;
 let vertexType = vi % 6u;
 if (colIdx >= maxCols) {
@@ -181,7 +192,7 @@ out.normY = 0.0;
 return out;
 }
 let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
+let safeRangeY = select(viewRangeY, 1.0, viewRangeY <= 0.0);
 let normMinY = (min(bd.minY, 0.0) - u.viewMinY) / safeRangeY;
 let normMaxY = (max(bd.maxY, 0.0) - u.viewMinY) / safeRangeY;
 let top = 1.0 - normMaxY;

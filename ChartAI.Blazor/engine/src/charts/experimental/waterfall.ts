@@ -100,18 +100,21 @@ export const WaterfallChart: RendererPlugin = {
         { binding: 4, source: "h-data" },
         { binding: 5, source: "t-data" },
         { binding: 6, source: "bw-data" },
+        { binding: 7, source: "series-info" },
       ],
     },
   ],
 
+  // Gaps (null / NaN in x or the bar base) are skipped, as the shader skips them.
   computeBounds(series) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const s of series) {
       for (let i = 0; i < s.rawX.length; i++) {
         const x = s.rawX[i];
         const barBottom = s.rawY[i];
-        const barHeight = (s.extra["h"] as number[] | undefined)?.[i] ?? 0;
-        const barTop = barBottom + barHeight;
+        if (x == null || barBottom == null || x !== x || barBottom !== barBottom) continue;
+        const barHeight = (s.extra["h"] as number[] | undefined)?.[i] || 0;
+        const barTop = barBottom + Math.max(0, barHeight);
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (barBottom < minY) minY = barBottom;

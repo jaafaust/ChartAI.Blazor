@@ -77,15 +77,29 @@ the plot with `LabelPosition = AnnotationLabelPosition.Top`; neighbouring labels
 
 Charts on one page can be linked: the module's `setSyncViews(mode)` mirrors a zoom or pan to every
 other chart - `true` or `"both"` on both axes, `"x"` or `"y"` on one. A trend page links the time
-axis and leaves each plot its own scale.
+axis and leaves each plot its own scale. Linked charts share the visible data range, so charts
+whose data covers different spans still show the same window. `ViewChanged` is raised for every
+chart whose view moved: the one the user dragged, the charts that followed it, and a view moved by
+the minimap, the range selector or `ResetViewAsync()`.
 
 ### Updating a chart
 
-* Assign a **new** `Config` or `Series` instance and the component pushes the change to the engine
-  (changes are detected by reference).
-* Mutated an object in place? Call `RefreshAsync()` on a `@ref` to resend it.
+* `Config` changes are detected by comparing its serialized JSON with what was last sent: a new
+  instance with the same content costs nothing, and an object changed in place is picked up the
+  next time the parent renders. `RefreshConfigAsync()` on a `@ref` sends it right away.
+* `Series` changes are detected by reference: assign a **new** collection to send new data.
+  `RefreshAsync()` resends `Config` and `Series`.
 * `SetDataAsync(series)` replaces the data; `ResetViewAsync()` animates back to fit-to-data.
-* A missing sample is `double.NaN` in any channel; it travels as JSON null and renders as a gap.
+* The methods can be called as soon as the `@ref` is set, in `OnAfterRenderAsync(firstRender)`
+  say: a call made while the chart is still initialising runs once it is up. `Ready` completes
+  with true then, or with false when the chart never comes up (no WebGPU, or it was disposed);
+  the methods then do nothing and `PatchDataAsync` returns 0. Await `Ready` before starting a
+  timer that feeds the chart.
+* Changing `Plugins` recreates the chart; the data it shows is kept, including data from
+  `SetDataAsync` and `PatchDataAsync`. `Id` is read once, when the chart is created.
+* A missing sample is `double.NaN` in any channel and renders as a gap. The series cross JS
+  interop as binary float64 (a shared x once), not as JSON text. NaN or an infinity in a config
+  value, a bound or an annotation serializes as null: the value counts as unset.
 * While the pointer is on a line that series is drawn on top and the others fade
   (`ChartConfig.HighlightHover`); the tooltip leads with it. Dragging an axis gutter pans that
   axis, the wheel over it zooms it.
@@ -103,8 +117,8 @@ the existing GPU buffers. Every series of such a chart shares the x axis, ascend
 <Chart @ref="chart" Config="config" Series="series" ViewChanged="OnViewChanged" />
 
 @code {
-    // Buffers for a window of 500 columns; they grow on demand when a patch does not fit.
-    private readonly ChartConfig config = new() { Type = ChartType.Line, Capacity = 512 };
+    // A window of 500 columns with room for as many again, see "What a tick costs" below.
+    private readonly ChartConfig config = new() { Type = ChartType.Line, Capacity = 1000 };
 
     private Task Tick(double x, double a, double b) => chart.PatchDataAsync(new ChartPatch
     {
@@ -125,19 +139,35 @@ the existing GPU buffers. Every series of such a chart shares the x axis, ascend
   new arrived. A side left null keeps its value.
 * `ResetView` puts the view back to its home transform, so the moved window is what is shown.
 * `SetDataAsync(series, capacity, bounds)` reloads everything with the buffers sized for `capacity`.
+  Without `bounds` the window fits the data (or `DefaultBounds`) again.
 * With several y axes a patch keeps the secondary axes' ranges; reload with `SetDataAsync` to
   rescale them.
 
+**What a tick costs.** A patch crosses interop as one small binary block, and its columns are
+copied into the chart's column store and written into the GPU buffers; nothing else is uploaded.
+A dropped column is only skipped: the chart draws from the first column still in the window.
+When the buffers are full, the columns of the window are moved back to their start and uploaded
+once (a full-window write, without recreating anything), or the buffers grow to twice their size
+(one full upload) when that would free less than a quarter of them. With `Capacity` twice the
+window that happens once per window of ticks. What does not shrink with the delta is the GPU's
+work: after a patch it reruns its per-pixel reduction over the visible columns of every series,
+so a frame costs the window times the series, as for any redraw. Compute the bounds you send from
+the samples you have (`double.NaN` makes `Min()` and `Max()` NaN).
+
 ### Dark mode
 
-Set `ChartConfig.IsDark` per chart, or switch every chart at once from your own JS interop:
+`ChartConfig.IsDark = true` switches the engine to its dark theme, and setting it back to false
+switches to light. The theme is **global**: every chart on the page follows it, whichever chart
+set it, so set it on one chart (or on all of them alike). A chart that leaves `IsDark` false does
+not touch the theme. To switch every chart at once from your own JS interop:
 
 ```csharp
 var mod = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChartAI.Blazor/chartai-blazor.js");
 await mod.InvokeVoidAsync("setTheme", isDark);
 ```
 
-The engine also reads a `dark` class on `<html>` when it initialises.
+When the engine initialises it reads a `dark` class on `<html>`, unless `setTheme` was already
+called.
 
 ## Multiple Y axes
 
@@ -188,6 +218,9 @@ own `dist/chart-library.js`.
 * `dotnet build` runs the bundler automatically when Bun is on the PATH and a source file is
   newer than the bundle. Without Bun the committed bundle is used and a warning is logged.
   `-p:ChartAiSkipEngineBuild=true` disables the step.
+* The bundle is built with the Bun version CI pins (1.4.2, `ChartAiBunVersion` in the csproj).
+  With another version on the PATH the build keeps the committed bundle and warns, since a
+  different Bun can emit a different file; `-p:ChartAiAnyBunVersion=true` builds with it anyway.
 * To build by hand, run in `ChartAI.Blazor/engine`:
 
   ```bash
@@ -205,6 +238,9 @@ Releases are published by the `Release` GitHub Actions workflow. Push a tag `vX.
 workflow packs `ChartAI.Blazor X.Y.Z`, pushes it to nuget.org and attaches the package to a GitHub
 release. It authenticates with nuget.org Trusted Publishing, so no API key is stored; the
 nuget.org account needs a trusted publishing policy for this repository and workflow file.
+The tagged commit must be on `master`. A version that nuget.org already has fails the run, and
+the GitHub release is only created once nuget.org accepted the package, so a re-pushed tag never
+attaches a package that differs from the published one.
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0

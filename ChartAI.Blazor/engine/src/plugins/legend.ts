@@ -38,6 +38,8 @@ interface LegendState {
   lastHidden: string;
   rowsDirty: boolean;
   computedWidth: number;
+  // The styles applyStyles last wrote, so a draw writes them only when they change.
+  stylesKey: string;
 }
 
 const states = new WeakMap<InternalChart, LegendState>();
@@ -126,6 +128,9 @@ export const legendPlugin: ChartPlugin<LegendConfig> = {
       passive: false,
       signal: ac.signal,
     });
+    // The controls handle their press on pointerdown; the click that follows it belongs to them
+    // too and must not reach the chart (a ruler point, a tooltip pin, the host's handlers).
+    overlay.addEventListener("click", (e) => e.stopPropagation(), { signal: ac.signal });
 
     list.addEventListener(
       "pointerdown",
@@ -185,6 +190,7 @@ export const legendPlugin: ChartPlugin<LegendConfig> = {
       lastHidden: "",
       rowsDirty: true,
       computedWidth: PANEL_MAX_WIDTH,
+      stylesKey: "",
     };
     states.set(chart, s);
 
@@ -238,6 +244,9 @@ function applyStyles(chart: InternalChart<ChartConfig & LegendConfig>) {
   const s = states.get(chart);
   if (!s) return;
   const styles = getLegendStyles(chart);
+  const key = Object.values(styles).join("|");
+  if (key === s.stylesKey) return;
+  s.stylesKey = key;
 
   const border = `1px solid ${styles.panelBorder}`;
   s.container.style.background = styles.panelBg;

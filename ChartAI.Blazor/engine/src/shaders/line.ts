@@ -17,55 +17,60 @@ valid: f32,
 @group(0) @binding(3) var<storage, read_write> lineData: array<LineData>;
 @group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
 @group(0) @binding(5) var<uniform> lu: LineUniforms;
+@group(0) @binding(6) var<uniform> seriesIdx: SeriesIndex;
 ${BINARY_SEARCH}
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
 let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
-}
+// One entry per pixel column; the buffer's length caps them should the width ever outgrow it.
+let maxCols = min(u32(u.width), arrayLength(&lineData));
+if (outputIdx >= maxCols) {
 return;
 }
+// This series' samples: [seriesStart, seriesEnd) of its buffers.
+let range = allSeries[seriesIdx.index].visibleRange;
+let seriesStart = range.x;
+let seriesEnd = range.x + range.y;
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
+if (range.y == 0u || viewRangeX <= 0.0 || viewRangeY <= 0.0) {
 lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
 return;
 }
 let relPx = f32(outputIdx);
 let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
 let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
+// Columns beyond the buffered samples stay empty. This tests the samples themselves, not the
+// chart bounds: a follow window narrower than the buffer still shows the rest when panned to.
+let firstX = dataX[seriesStart];
+let lastX = dataX[seriesEnd - 1u];
+if ((firstX > -1.0e38 && pixelMaxX < firstX) || (lastX > -1.0e38 && pixelMinX > lastX)) {
 lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
 return;
 }
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
+let startIdx = lowerBound(pixelMinX, seriesStart, seriesEnd);
+let endIdx = lowerBound(pixelMaxX, startIdx, seriesEnd);
 let centerX = (pixelMinX + pixelMaxX) * 0.5;
 if (startIdx >= endIdx) {
 var bestIdx = startIdx;
-if (startIdx > 0u && startIdx < count) {
+if (startIdx > seriesStart && startIdx < seriesEnd) {
 let distPrev = abs(dataX[startIdx - 1u] - centerX);
 let distCurr = abs(dataX[startIdx] - centerX);
 if (distPrev < distCurr) {
 bestIdx = startIdx - 1u;
 }
-} else if (startIdx >= count && count > 0u) {
-bestIdx = count - 1u;
+} else if (startIdx >= seriesEnd) {
+bestIdx = seriesEnd - 1u;
 }
 // The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
 // edge is drawn even when the half nearer to that neighbour lies entirely off screen.
-if (outputIdx == 0u && startIdx > 0u) {
+if (outputIdx == 0u && startIdx > seriesStart) {
 bestIdx = startIdx - 1u;
 }
-if (outputIdx + 1u == maxCols && startIdx < count) {
+if (outputIdx + 1u == maxCols && startIdx < seriesEnd) {
 bestIdx = startIdx;
 }
-if (bestIdx >= count) {
+if (bestIdx >= seriesEnd) {
 lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
 return;
 }
@@ -147,7 +152,7 @@ struct VertexOutput {
 @vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) series_idx: u32) -> VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&lineData));
 let segIdx = vi / 2u;
 let endpoint = vi % 2u;
 if (segIdx < maxCols) {

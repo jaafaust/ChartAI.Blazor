@@ -1,6 +1,6 @@
 import type { RendererPlugin } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
-import { COMPUTE_WG } from "../shaders/shared.ts";
+import { dispatch2D } from "../shaders/shared.ts";
 import {
   BOIDS_INIT_SHADER,
   BOIDS_CLEAR_SHADER,
@@ -59,13 +59,14 @@ export const BoidsChart: RendererPlugin = {
       type: "compute",
       shader: "init",
       perSeries: true,
-      dispatch: ({ samples }) => ({ x: Math.ceil(samples / COMPUTE_WG) }),
+      dispatch: ({ samples }) => dispatch2D(samples),
       bindings: [
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "x-data" },
         { binding: 2, source: "y-data" },
         { binding: 3, source: "boidsState", write: true },
         { binding: 4, source: "series-index" },
+        { binding: 5, source: "series-info" },
       ],
     },
     // Clear spatial grid counts to zero
@@ -81,12 +82,14 @@ export const BoidsChart: RendererPlugin = {
       type: "compute",
       shader: "insert",
       perSeries: true,
-      dispatch: ({ samples }) => ({ x: Math.ceil(samples / COMPUTE_WG) }),
+      dispatch: ({ samples }) => dispatch2D(samples),
       bindings: [
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "boidsState" },
         { binding: 2, source: "gridCount", write: true },
         { binding: 3, source: "gridBoids", write: true },
+        { binding: 4, source: "series-info" },
+        { binding: 5, source: "series-index" },
       ],
     },
     // Simulate: 5×5 grid neighbourhood per boid, MAX_PER_CELL cap
@@ -94,13 +97,14 @@ export const BoidsChart: RendererPlugin = {
       type: "compute",
       shader: "sim",
       perSeries: true,
-      dispatch: ({ samples }) => ({ x: Math.ceil(samples / COMPUTE_WG) }),
+      dispatch: ({ samples }) => dispatch2D(samples),
       bindings: [
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "boidsState", write: true },
         { binding: 2, source: "series-index" },
         { binding: 3, source: "gridCount" },
         { binding: 4, source: "gridBoids" },
+        { binding: 5, source: "series-info" },
       ],
     },
     // Render: per-boid quads, simple circle SDF

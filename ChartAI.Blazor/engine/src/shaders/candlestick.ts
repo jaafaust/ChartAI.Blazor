@@ -1,7 +1,7 @@
 import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
 
-// Shared helpers embedded into both shaders
-const CANDLE_TYPES = `
+// Shared helpers embedded into the candlestick and OHLC shaders
+export const CANDLE_TYPES = `
 struct CandleUniforms {
   maxSamples: f32,
   upColor:    u32,
@@ -23,20 +23,32 @@ struct CandleData {
 // Returns the effective grouping interval in X-axis units.
 // If cu.interval > 0 it is used directly; otherwise auto-selects the smallest
 // standard timeframe that gives each candle at least cu.binSize screen pixels.
-const EFFECTIVE_INTERVAL = `
+// Either way candleData holds one candle per pixel column: when the view spans more
+// intervals than that, whole multiples of the interval are merged into one candle.
+// Only differences and the (period-aligned) rebased view enter here, never absolute x.
+export const EFFECTIVE_INTERVAL = `
 fn effectiveInterval() -> f32 {
-  if (cu.interval > 0.0) { return cu.interval; }
-  let raw = (u.viewMaxX - u.viewMinX) / u.width * f32(cu.binSize);
-  let steps = array<f32, 20>(
-    1.0, 2.0, 5.0, 10.0, 15.0, 30.0,
-    60.0, 120.0, 300.0, 600.0, 900.0, 1800.0,
-    3600.0, 7200.0, 14400.0, 43200.0,
-    86400.0, 259200.0, 604800.0, 2592000.0
-  );
-  for (var i = 0u; i < 20u; i++) {
-    if (steps[i] >= raw) { return steps[i]; }
+  let viewRangeX = u.viewMaxX - u.viewMinX;
+  var iv = cu.interval;
+  if (iv <= 0.0) {
+    let raw = viewRangeX / u.width * f32(max(cu.binSize, 1u));
+    let steps = array<f32, 20>(
+      1.0, 2.0, 5.0, 10.0, 15.0, 30.0,
+      60.0, 120.0, 300.0, 600.0, 900.0, 1800.0,
+      3600.0, 7200.0, 14400.0, 43200.0,
+      86400.0, 259200.0, 604800.0, 2592000.0
+    );
+    iv = raw;
+    for (var i = 0u; i < 20u; i++) {
+      if (steps[i] >= raw) { iv = steps[i]; break; }
+    }
   }
-  return raw;
+  let cols = max(u.width - 2.0, 1.0);
+  return iv * max(1.0, ceil(viewRangeX / (iv * cols)));
+}
+fn candleBins(interval: f32) -> u32 {
+  let viewRangeX = u.viewMaxX - u.viewMinX;
+  return min(u32(ceil(viewRangeX / interval)) + 2u, min(u32(u.width), arrayLength(&candleData)));
 }`;
 
 export const CANDLESTICK_COMPUTE_SHADER = `${UNIFORM_STRUCT}
@@ -53,24 +65,36 @@ ${CANDLE_TYPES}
 @group(0) @binding(9) var<storage, read>       dataLow:  array<f32>;
 ${BINARY_SEARCH}
 ${EFFECTIVE_INTERVAL}
+// Sample i as (open, high, low, close). A gap in close (-3e38, GPU_GAP in chart-library.ts)
+// is a missing candle; a gap in open, high or low falls back to the close.
+fn candleAt(i: u32) -> vec4f {
+  let c = dataClose[i];
+  var o = dataOpen[i];
+  if (o < -1.0e38) { o = c; }
+  var h = dataHigh[i];
+  if (h < -1.0e38) { h = max(o, c); }
+  var l = dataLow[i];
+  if (l < -1.0e38) { l = min(o, c); }
+  return vec4f(o, h, l, c);
+}
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
 let binIdx     = id.x;
-let totalPixels = u32(u.width);
-let count      = u.pointCount;
-if (count == 0u) {
-  if (binIdx < totalPixels) { candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0); }
-  return;
-}
+let maxBins    = min(u32(u.width), arrayLength(&candleData));
+if (binIdx >= maxBins) { return; }
+// This series' samples: [seriesStart, seriesEnd) of its buffers.
+let range      = allSeries[seriesIdx.index].visibleRange;
+let seriesStart      = range.x;
+let seriesEnd        = range.x + range.y;
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
-  if (binIdx < totalPixels) { candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0); }
+if (range.y == 0u || viewRangeX <= 0.0 || viewRangeY <= 0.0) {
+  candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);
   return;
 }
 let interval     = effectiveInterval();
 let alignedStart = floor(u.viewMinX / interval) * interval;
-let numBins      = min(u32(ceil(viewRangeX / interval)) + 2u, totalPixels);
+let numBins      = candleBins(interval);
 if (binIdx >= numBins) { return; }
 let binMinX = alignedStart + f32(binIdx) * interval;
 let binMaxX = binMinX + interval;
@@ -83,22 +107,21 @@ let screenX  = (binMidX - u.viewMinX) / viewRangeX;
 let barWidth = interval / viewRangeX;
 let onePixel = 1.0 / u.width;
 let bw       = max(barWidth * 0.95, onePixel);
-let startIdx = lowerBound(binMinX, count);
-var endIdx   = lowerBound(binMaxX, count);
-endIdx = min(endIdx, count);
+let startIdx = lowerBound(binMinX, seriesStart, seriesEnd);
+let endIdx   = lowerBound(binMaxX, startIdx, seriesEnd);
 if (startIdx >= endIdx) {
   // No data starts in this interval — find nearest candle that visually overlaps
   var bestIdx:  u32  = 0u;
   var bestDist: f32  = 1e10;
   var hit = false;
-  if (startIdx < count) {
+  if (startIdx < seriesEnd) {
     let bx = dataX[startIdx];
     let hw = interval * 0.5;
     if (binMinX < bx + hw && binMaxX > bx - hw) {
       bestIdx = startIdx; bestDist = abs(bx - binMidX); hit = true;
     }
   }
-  if (startIdx > 0u) {
+  if (startIdx > seriesStart) {
     let prev = startIdx - 1u;
     let bx   = dataX[prev];
     let hw   = interval * 0.5;
@@ -108,36 +131,48 @@ if (startIdx >= endIdx) {
       hit = true;
     }
   }
-  if (!hit) {
+  let k = candleAt(bestIdx);
+  if (!hit || k.w < -1.0e38) {
     candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);
     return;
   }
-  let o = dataOpen[bestIdx];
-  let h = dataHigh[bestIdx];
-  let l = dataLow[bestIdx];
-  let c = dataClose[bestIdx];
-  candleData[binIdx] = CandleData(screenX, bw, l, min(o,c), max(o,c), h, select(0.0,1.0,c>=o));
+  candleData[binIdx] = CandleData(screenX, bw, k.z, min(k.x,k.w), max(k.x,k.w), k.y, select(0.0,1.0,k.w>=k.x));
   return;
 }
-// Aggregate OHLC across all data points in this interval
-let o        = dataOpen[startIdx];
-var h        = dataHigh[startIdx];
-var l        = dataLow[startIdx];
-let c        = dataClose[endIdx - 1u];
+// Aggregate OHLC across the samples in this interval, gaps left out: open of the first,
+// close of the last, extremes of all.
+var found = false;
+var o = 0.0;
+var c = 0.0;
+var h = -3.0e38;
+var l = 3.0e38;
 let rangeCount  = endIdx - startIdx;
 let maxSamples  = u32(cu.maxSamples);
-if (maxSamples > 0u && rangeCount > maxSamples) {
+if (maxSamples > 1u && rangeCount > maxSamples) {
   let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
-  for (var s = 0u; s < maxSamples; s++) {
-    let idx = startIdx + u32(f32(s) * stride);
-    if (idx < endIdx) { h = max(h, dataHigh[idx]); l = min(l, dataLow[idx]); }
+  for (var s = 0u; s <= maxSamples; s++) {
+    // The extra last step visits endIdx - 1 itself, whatever the rounding of the stride.
+    let idx = select(startIdx + u32(f32(s) * stride), endIdx - 1u, s == maxSamples);
+    if (idx < endIdx) {
+      let k = candleAt(idx);
+      if (k.w > -1.0e38) {
+        if (!found) { o = k.x; found = true; }
+        c = k.w; h = max(h, k.y); l = min(l, k.z);
+      }
+    }
   }
-  h = max(h, dataHigh[endIdx - 1u]);
-  l = min(l, dataLow[endIdx - 1u]);
 } else {
   for (var i = startIdx; i < endIdx; i++) {
-    h = max(h, dataHigh[i]); l = min(l, dataLow[i]);
+    let k = candleAt(i);
+    if (k.w > -1.0e38) {
+      if (!found) { o = k.x; found = true; }
+      c = k.w; h = max(h, k.y); l = min(l, k.z);
+    }
   }
+}
+if (!found) {
+  candleData[binIdx] = CandleData(0.0,0.0,0.0,0.0,0.0,0.0,0.0);
+  return;
 }
 candleData[binIdx] = CandleData(screenX, bw, l, min(o,c), max(o,c), h, select(0.0,1.0,c>=o));
 }
@@ -159,13 +194,11 @@ struct VertexOutput {
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
 var out: VertexOutput;
 let viewRangeX = u.viewMaxX - u.viewMinX;
-let interval   = effectiveInterval();
-let numBins    = min(u32(ceil(viewRangeX / interval)) + 2u, u32(u.width));
 let colIdx     = vi / 30u;
 let localVi    = vi % 30u;
 let section    = localVi / 6u;
 let vertexType = localVi % 6u;
-if (colIdx >= numBins) {
+if (viewRangeX <= 0.0 || colIdx >= candleBins(effectiveInterval())) {
   out.pos = vec4f(0.0,0.0,0.0,0.0); out.isUp = 0.0; out.isWick = 0.0; return out;
 }
 let cd = candleData[colIdx];
@@ -175,7 +208,7 @@ if (cd.barWidth <= 0.0) {
 out.isUp   = cd.isUp;
 out.isWick = select(0.0, 1.0, section > 0u);
 let viewRangeY = u.viewMaxY - u.viewMinY;
-let safeRangeY = select(viewRangeY, 1.0, viewRangeY < 0.0001);
+let safeRangeY = select(viewRangeY, 1.0, viewRangeY <= 0.0);
 let onePixelX  = 1.0 / u.width;
 let onePixelY  = 1.0 / u.height;
 var sLeft: f32; var sRight: f32; var sTop: f32; var sBottom: f32;

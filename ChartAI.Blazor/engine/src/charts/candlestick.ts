@@ -87,17 +87,26 @@ export const CandlestickChart: RendererPlugin = {
     },
   ],
 
+  // Also OhlcChart's. Gaps (null / NaN) are skipped; the close (y) counts too, so the candles fit
+  // even without high/low.
   computeBounds(series) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const s of series) {
       for (const x of s.rawX) {
+        if (x == null || x !== x) continue;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
       }
-      for (const y of (s.extra.high ?? [])) { if (y > maxY) maxY = y; }
-      for (const y of (s.extra.low  ?? [])) { if (y < minY) minY = y; }
+      for (const arr of [s.rawY, s.extra.high ?? [], s.extra.low ?? []]) {
+        for (const y of arr) {
+          if (y == null || y !== y) continue;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
     }
     if (!isFinite(minX)) return { minX: 0, maxX: 1, minY: 0, maxY: 1 };
+    if (!isFinite(minY)) { minY = 0; maxY = 1; }
     const px = (maxX - minX) * 0.05 || 1;
     const py = (maxY - minY) * 0.1  || 1;
     return { minX: minX - px, maxX: maxX + px, minY: minY - py, maxY: maxY + py };

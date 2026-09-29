@@ -44,6 +44,7 @@ export const LineChart: RendererPlugin = {
         { binding: 3, source: "lineBuffer", write: true },
         { binding: 4, source: "series-info" },
         { binding: 5, source: "custom-uniforms" },
+        { binding: 6, source: "series-index" },
       ],
     },
     {

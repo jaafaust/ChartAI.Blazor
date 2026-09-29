@@ -21,7 +21,8 @@ export const StepChart: RendererPlugin = {
   },
   uniforms: [
     { name: "maxSamplesPerPixel", type: "u32", default: 10000 },
-    { name: "stepMode", type: "u32", default: 0 },
+    // The config names the mode; ChartManager maps the name to the shader's number through `values`.
+    { name: "stepMode", type: "u32", default: 0, values: { after: 0, before: 1, center: 2 } },
   ],
   buffers: [
     {
@@ -43,6 +44,7 @@ export const StepChart: RendererPlugin = {
         { binding: 3, source: "lineBuffer", write: true },
         { binding: 4, source: "series-info" },
         { binding: 5, source: "custom-uniforms" },
+        { binding: 6, source: "series-index" },
       ],
     },
     {

@@ -1,6 +1,7 @@
 import type { ChartPlugin, InternalChart } from "../../types.ts";
 import { ChartManager } from "../../chart-library.ts";
 import { chartMargin } from "../shared.ts";
+import { scheduleDraw } from "../redraw.ts";
 
 export interface CrosshairConfig {
   crosshairX?: boolean;
@@ -47,7 +48,7 @@ export const crosshairPlugin: ChartPlugin<CrosshairConfig> = {
         state.mouseX = e.clientX - r.left;
         state.mouseY = e.clientY - r.top;
         state.visible = true;
-        ChartManager.drawChart(chart);
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );
@@ -57,7 +58,7 @@ export const crosshairPlugin: ChartPlugin<CrosshairConfig> = {
         ev,
         () => {
           state.visible = false;
-          ChartManager.drawChart(chart);
+          scheduleDraw(chart);
         },
         { signal: ac.signal },
       ),

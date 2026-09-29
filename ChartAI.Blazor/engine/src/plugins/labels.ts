@@ -1,6 +1,13 @@
 import type { ChartPlugin, ChartConfig, InternalChart } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
-import { chartMargin, hasRightAxes, yAxisStrips } from "./shared.ts";
+import {
+  chartMargin,
+  hasRightAxes,
+  niceTicks,
+  rebaseViewOnHomeChange,
+  yAxisStrips,
+} from "./shared.ts";
+import { commitView } from "./redraw.ts";
 
 export const DEFAULT_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
@@ -42,18 +49,6 @@ function computeHomeView(chart: InternalChart<ChartConfig & LabelsConfig>) {
     zoomY: innerH > 0 ? innerH / height : 1,
   };
 }
-
-const niceTicks = (min: number, max: number, count: number) => {
-  const range = max - min;
-  if (range <= 0) return [min];
-  const rough = range / count,
-    mag = 10 ** Math.floor(Math.log10(rough)),
-    res = rough / mag;
-  const step = mag * (res <= 1.5 ? 1 : res <= 3 ? 2 : res <= 7 ? 5 : 10);
-  const ticks: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max; v += step) ticks.push(v);
-  return ticks;
-};
 
 const getViewState = (chart: InternalChart<ChartConfig & LabelsConfig>) => {
   const w = chart.width,
@@ -107,8 +102,11 @@ export const labelsPlugin: ChartPlugin<LabelsConfig> = {
       hv.panX !== old.panX ||
       hv.panY !== old.panY
     ) {
-      chart.view = { ...hv };
-      ChartManager.requestRender(chart.id);
+      // The plot area moved (a resize, a y axis added): a view at home follows it, a zoomed or
+      // panned one keeps the data it showed. The commit waits for this draw to finish, since it
+      // redraws the chart.
+      chart.view = rebaseViewOnHomeChange(chart.view, old, hv);
+      queueMicrotask(() => commitView(chart));
     }
     const { w, h, m, rx, ry, mx, my, grid } = getViewState(chart);
     const plotRight = w - (hasRightAxes(chart) ? m.right : 0);
@@ -136,11 +134,10 @@ export const labelsPlugin: ChartPlugin<LabelsConfig> = {
 
   afterDraw(ctx, chart) {
     const { w, h, m, rx, ry, mx, my, bg, font, text } = getViewState(chart);
-    const {
-      formatX = String,
-      formatY = String,
-      labelSize = DEFAULT_LABEL_SIZE,
-    } = chart.config;
+    // `??` rather than destructuring defaults: a reset option arrives as null.
+    const formatX = chart.config.formatX ?? String;
+    const formatY = chart.config.formatY ?? String;
+    const labelSize = chart.config.labelSize ?? DEFAULT_LABEL_SIZE;
 
     const drawFade = (
       dir: "left" | "right" | "bottom",

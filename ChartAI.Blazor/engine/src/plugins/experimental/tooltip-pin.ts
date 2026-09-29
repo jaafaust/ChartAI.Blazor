@@ -1,8 +1,9 @@
 import type { ChartPlugin, InternalChart, ChartConfig } from "../../types.ts";
 import { ChartManager } from "../../chart-library.ts";
 import { DEFAULT_FONT } from "../labels.ts";
-import { chartMargin, seriesAxisFormat } from "../shared.ts";
+import { chartMargin, clickFollowsDrag, seriesAxisFormat } from "../shared.ts";
 import { dataToScreen, screenToData } from "../coords.ts";
+import { scheduleDraw } from "../redraw.ts";
 
 export interface TooltipPinConfig {
   pinMax?: number;
@@ -51,7 +52,11 @@ function findNearestPin(
   let bestDx = Infinity;
   let bestDy = Infinity;
 
+  // Hidden series cannot be pinned, and a series with a gap in the nearest column has nothing
+  // there to pin (it used to become an invisible NaN pin that pushed out a real one).
+  const hidden = chart.config.hiddenSeries;
   for (let s = 0; s < chart.series.length; s++) {
+    if (hidden?.has(s)) continue;
     const sr = chart.series[s];
     const n = sr.rawX.length;
     if (n === 0) continue;
@@ -68,8 +73,10 @@ function findNearestPin(
       idx = lo - 1;
     }
 
+    const y = (sr.plotY ?? sr.rawY)[idx];
+    if (!Number.isFinite(y) || !Number.isFinite(sr.rawX[idx])) continue;
     const dx = Math.abs(sr.rawX[idx] - dataX);
-    const dy = Math.abs((sr.plotY ?? sr.rawY)[idx] - dataY);
+    const dy = Math.abs(y - dataY);
     if (dx < bestDx || (dx === bestDx && dy < bestDy)) {
       bestDx = dx;
       bestDy = dy;
@@ -112,7 +119,8 @@ export const tooltipPinPlugin: ChartPlugin<TooltipPinConfig> = {
     el.addEventListener(
       "click",
       (e) => {
-        if (chart.dragging) return;
+        // The click that ends a pan is not a pick.
+        if (chart.dragging || clickFollowsDrag(chart)) return;
         const r = el.getBoundingClientRect();
         const sx = e.clientX - r.left;
         const sy = e.clientY - r.top;
@@ -123,7 +131,7 @@ export const tooltipPinPlugin: ChartPlugin<TooltipPinConfig> = {
           if (Math.hypot(pinSx - sx, pinSy - sy) < 20) {
             state.pins.splice(i, 1);
             e.preventDefault();
-            ChartManager.drawChart(chart);
+            scheduleDraw(chart);
             return;
           }
         }
@@ -136,7 +144,7 @@ export const tooltipPinPlugin: ChartPlugin<TooltipPinConfig> = {
         const maxPins = cfg.pinMax ?? 5;
         if (state.pins.length >= maxPins) state.pins.shift();
         state.pins.push(nearest);
-        ChartManager.drawChart(chart);
+        scheduleDraw(chart);
       },
       { signal: ac.signal },
     );

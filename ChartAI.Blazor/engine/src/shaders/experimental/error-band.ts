@@ -23,55 +23,67 @@ valid: f32,
 @group(0) @binding(5) var<uniform> eu: ErrorBandUniforms;
 @group(0) @binding(6) var<storage, read> loData: array<f32>;
 @group(0) @binding(7) var<storage, read> hiData: array<f32>;
+@group(0) @binding(8) var<uniform> seriesIdx: SeriesIndex;
 ${BINARY_SEARCH}
+// The band of sample i (whose y is valid) as (bottom, top): lo and hi in either order, a missing
+// side taken as y, so a column of many samples spans what the same samples span one by one.
+fn bandAt(i: u32, y: f32) -> vec2f {
+var lo = loData[i];
+var hi = hiData[i];
+if (lo < -1.0e38) { lo = y; }
+if (hi < -1.0e38) { hi = y; }
+return vec2f(min(lo, hi), max(lo, hi));
+}
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
 let outputIdx = id.x;
-let maxCols = u32(u.width);
-let count = u.pointCount;
-if (outputIdx >= maxCols || count == 0u) {
-if (outputIdx < maxCols) {
-bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
-}
+let maxCols = min(u32(u.width), arrayLength(&bandData));
+if (outputIdx >= maxCols) {
 return;
 }
+// This series' samples: [seriesStart, seriesEnd) of its buffers.
+let range = allSeries[seriesIdx.index].visibleRange;
+let seriesStart = range.x;
+let seriesEnd = range.x + range.y;
 let viewRangeX = u.viewMaxX - u.viewMinX;
 let viewRangeY = u.viewMaxY - u.viewMinY;
-if (viewRangeX < 0.0001 || viewRangeY < 0.0001) {
+if (range.y == 0u || viewRangeX <= 0.0 || viewRangeY <= 0.0) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
 let relPx = f32(outputIdx);
 let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
 let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
-if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
+// Columns beyond the buffered samples stay empty (tested against the samples, not the bounds).
+let firstX = dataX[seriesStart];
+let lastX = dataX[seriesEnd - 1u];
+if ((firstX > -1.0e38 && pixelMaxX < firstX) || (lastX > -1.0e38 && pixelMinX > lastX)) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
-let startIdx = lowerBound(pixelMinX, count);
-var endIdx = lowerBound(pixelMaxX, count);
-endIdx = min(endIdx, count);
+let startIdx = lowerBound(pixelMinX, seriesStart, seriesEnd);
+let endIdx = lowerBound(pixelMaxX, startIdx, seriesEnd);
 let centerX = (pixelMinX + pixelMaxX) * 0.5;
 if (startIdx >= endIdx) {
 var bestIdx = startIdx;
-if (startIdx > 0u && startIdx < count) {
+if (startIdx > seriesStart && startIdx < seriesEnd) {
 let distPrev = abs(dataX[startIdx - 1u] - centerX);
 let distCurr = abs(dataX[startIdx] - centerX);
 if (distPrev < distCurr) {
 bestIdx = startIdx - 1u;
 }
-} else if (startIdx >= count && count > 0u) {
-bestIdx = count - 1u;
+} else if (startIdx >= seriesEnd) {
+bestIdx = seriesEnd - 1u;
 }
 // The outermost columns take the neighbour beyond the view, so the segment crossing a canvas
 // edge is drawn even when the half nearer to that neighbour lies entirely off screen.
-if (outputIdx == 0u && startIdx > 0u) {
+if (outputIdx == 0u && startIdx > seriesStart) {
 bestIdx = startIdx - 1u;
 }
-if (outputIdx + 1u == maxCols && startIdx < count) {
+if (outputIdx + 1u == maxCols && startIdx < seriesEnd) {
 bestIdx = startIdx;
 }
-if (bestIdx >= count) {
+if (bestIdx >= seriesEnd) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
@@ -80,21 +92,18 @@ if (y < -1.0e38) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
-var lo = loData[bestIdx];
-var hi = hiData[bestIdx];
-if (lo < -1.0e38) { lo = y; }
-if (hi < -1.0e38) { hi = y; }
+let band = bandAt(bestIdx, y);
 let normX = (dataX[bestIdx] - u.viewMinX) / viewRangeX;
 let normY = (y - u.viewMinY) / viewRangeY;
-let normLo = (lo - u.viewMinY) / viewRangeY;
-let normHi = (hi - u.viewMinY) / viewRangeY;
+let normLo = (band.x - u.viewMinY) / viewRangeY;
+let normHi = (band.y - u.viewMinY) / viewRangeY;
 bandData[outputIdx] = BandData(normX, 1.0 - normLo, 1.0 - normHi, 1.0 - normY, 1.0);
 return;
 }
 var dataMinY = 3.0e38;
 var dataMaxY = -3.0e38;
-var dataMinLo = 3.0e38;
-var dataMaxHi = -3.0e38;
+var bandMin = 3.0e38;
+var bandMax = -3.0e38;
 let rangeCount = endIdx - startIdx;
 let maxSamples = eu.maxSamplesPerPixel;
 if (maxSamples > 1u && rangeCount > maxSamples) {
@@ -106,10 +115,9 @@ let y = dataY[idx];
 if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
-let lo = loData[idx];
-let hi = hiData[idx];
-if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
-if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
+let band = bandAt(idx, y);
+bandMin = min(bandMin, band.x);
+bandMax = max(bandMax, band.y);
 }
 }
 }
@@ -117,10 +125,9 @@ let lastY = dataY[endIdx - 1u];
 if (lastY > -1.0e38) {
 dataMinY = min(dataMinY, lastY);
 dataMaxY = max(dataMaxY, lastY);
-let lastLo = loData[endIdx - 1u];
-let lastHi = hiData[endIdx - 1u];
-if (lastLo > -1.0e38) { dataMinLo = min(dataMinLo, lastLo); }
-if (lastHi > -1.0e38) { dataMaxHi = max(dataMaxHi, lastHi); }
+let band = bandAt(endIdx - 1u, lastY);
+bandMin = min(bandMin, band.x);
+bandMax = max(bandMax, band.y);
 }
 } else {
 for (var i = startIdx; i < endIdx; i++) {
@@ -128,10 +135,9 @@ let y = dataY[i];
 if (y > -1.0e38) {
 dataMinY = min(dataMinY, y);
 dataMaxY = max(dataMaxY, y);
-let lo = loData[i];
-let hi = hiData[i];
-if (lo > -1.0e38) { dataMinLo = min(dataMinLo, lo); }
-if (hi > -1.0e38) { dataMaxHi = max(dataMaxHi, hi); }
+let band = bandAt(i, y);
+bandMin = min(bandMin, band.x);
+bandMax = max(bandMax, band.y);
 }
 }
 }
@@ -139,17 +145,13 @@ if (dataMaxY < dataMinY) {
 bandData[outputIdx] = BandData(-1.0, -1.0, -1.0, -1.0, 0.0);
 return;
 }
-if (dataMaxHi < dataMinLo) {
-dataMinLo = dataMinY;
-dataMaxHi = dataMaxY;
-}
 // The vertex of a column that holds samples sits at the middle of those samples, not at the
 // pixel centre: the empty columns on either side collapse onto their nearest sample, so a
 // vertex left or right of that sample folds the strip back over itself and the overlap
 // shows as a darker seam wherever the fill is blended.
 let normX = ((dataX[startIdx] + dataX[endIdx - 1u]) * 0.5 - u.viewMinX) / viewRangeX;
-let normMinLo = (dataMinLo - u.viewMinY) / viewRangeY;
-let normMaxHi = (dataMaxHi - u.viewMinY) / viewRangeY;
+let normMinLo = (bandMin - u.viewMinY) / viewRangeY;
+let normMaxHi = (bandMax - u.viewMinY) / viewRangeY;
 let normMinY = (dataMinY - u.viewMinY) / viewRangeY;
 let normMaxY = (dataMaxY - u.viewMinY) / viewRangeY;
 let loScreenY = 1.0 - normMinLo;
@@ -185,7 +187,7 @@ struct VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
 out.valid = 0.0;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&bandData));
 if (vi >= maxCols * 2u) {
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
 return out;
@@ -193,15 +195,13 @@ return out;
 let col = vi / 2u;
 let onHi = (vi % 2u) == 0u;
 let d = bandData[col];
-let viewRangeX = u.viewMaxX - u.viewMinX;
-let leftBound = select(0.0, clamp((u.dataMinX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-let rightBound = select(1.0, clamp((u.dataMaxX - u.viewMinX) / viewRangeX, 0.0, 1.0), viewRangeX > 0.0001);
-var sx = clamp(d.screenX, leftBound, rightBound);
+// The columns' x are sample positions already (see the compute shader): no clamp to the bounds.
+var sx = d.screenX;
 var py = select(d.loScreenY, d.hiScreenY, onHi);
 if (d.valid < 0.5 && vi > 0u) {
 let prevCol = (vi - 1u) / 2u;
 let pd = bandData[prevCol];
-sx = clamp(pd.screenX, leftBound, rightBound);
+sx = pd.screenX;
 py = select(pd.loScreenY, pd.hiScreenY, (vi - 1u) % 2u == 0u);
 }
 let clipX = sx * 2.0 - 1.0;
@@ -240,19 +240,14 @@ struct VertexOutput {
 var out: VertexOutput;
 out.seriesIdx = series_idx;
 out.alpha = 0.0;
-let maxCols = u32(u.width);
+let maxCols = min(u32(u.width), arrayLength(&bandData));
 let segIdx = vi / 2u;
 let endpoint = vi % 2u;
-if (segIdx + 1u > maxCols) {
+if (segIdx + 1u >= maxCols) {
 out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
 return out;
 }
-let col = segIdx + endpoint;
-if (col >= maxCols) {
-out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
-return out;
-}
-let d = bandData[col];
+let d = bandData[segIdx + endpoint];
 let d0 = bandData[segIdx];
 let d1 = bandData[segIdx + 1u];
 let segValid = min(d0.valid, d1.valid);

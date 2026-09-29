@@ -1,5 +1,5 @@
 import type { RendererPlugin } from "../../types.ts";
-import { COMPUTE_WG } from "../../shaders/shared.ts";
+import { dispatch2D } from "../../shaders/shared.ts";
 import { BUBBLE_COMPUTE_SHADER } from "../../shaders/experimental/bubble.ts";
 
 export interface BubbleConfig {
@@ -13,15 +13,13 @@ declare module "../../types.ts" {
   }
 }
 
-const MAX_WG_DIM = 65535;
-
 export const BubbleChart: RendererPlugin = {
   name: "bubble",
   shaders: {
     compute: BUBBLE_COMPUTE_SHADER,
   },
+  // Order matters: it is the field order of BubbleUniforms in shaders/experimental/bubble.ts.
   uniforms: [
-    { name: "dispatchXCount", type: "u32", default: 1 },
     { name: "maxPointSize", type: "f32", default: 40 },
     { name: "minPointSize", type: "f32", default: 2 },
   ],
@@ -30,12 +28,7 @@ export const BubbleChart: RendererPlugin = {
       type: "compute",
       shader: "compute",
       perSeries: true,
-      dispatch: ({ samples }) => {
-        const totalWG = Math.ceil(Math.max(1, samples) / COMPUTE_WG);
-        const wgX = Math.min(totalWG, MAX_WG_DIM);
-        const wgY = Math.ceil(totalWG / MAX_WG_DIM);
-        return { x: wgX, y: wgY, xCount: wgX * COMPUTE_WG };
-      },
+      dispatch: ({ samples }) => dispatch2D(samples),
       bindings: [
         { binding: 0, source: "uniforms" },
         { binding: 1, source: "x-data" },

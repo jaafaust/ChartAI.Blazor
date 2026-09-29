@@ -7,8 +7,9 @@ namespace ChartAI.Blazor.Models;
 /// The value channels of one series: y plus the renderer-specific extra arrays the engine
 /// addresses by name in shaders (open/high/low for candlesticks and OHLC, lo/hi for error
 /// bands, r for bubbles, value for heatmaps, h/t/bw for waterfalls). <see cref="Extra"/>
-/// allows arbitrary custom channels. A missing sample is <see cref="double.NaN"/>; it travels
-/// as JSON null and the engine draws it as a gap.
+/// allows arbitrary custom channels. A missing sample is <see cref="double.NaN"/>; the engine
+/// draws it as a gap (the chart sends the channels to JS as binary float64, and JSON
+/// serialization writes it as null).
 /// <see cref="ChartSeries"/> adds the identity of a series (label, colour, x);
 /// <see cref="ChartPatch"/> carries only these channels for the columns it appends.
 /// </summary>
@@ -93,6 +94,7 @@ public class ChartSeries : ChartChannels
     public string Color { get; set; } = "#3b82f6";
 
     [JsonPropertyName("x")]
+    [JsonConverter(typeof(GapArrayConverter))]
     public double[] X { get; set; } = Array.Empty<double>();
 
     [JsonPropertyName("hidden")]
@@ -203,5 +205,37 @@ public sealed class GapArrayConverter : JsonConverter<double[]>
             else writer.WriteNullValue();
         }
         writer.WriteEndArray();
+    }
+}
+
+/// <summary>
+/// Serializes a single value with NaN and infinities as JSON null (System.Text.Json refuses
+/// them otherwise), and reads null back as NaN. The JS side reads null as "not set".
+/// </summary>
+public sealed class GapDoubleConverter : JsonConverter<double>
+{
+    public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.TokenType == JsonTokenType.Null ? double.NaN : reader.GetDouble();
+
+    public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
+    {
+        if (double.IsFinite(value)) writer.WriteNumberValue(value);
+        else writer.WriteNullValue();
+    }
+}
+
+/// <summary>
+/// Serializes an optional value with NaN and infinities as JSON null, the same as leaving it
+/// unset, instead of throwing.
+/// </summary>
+public sealed class GapNullableDoubleConverter : JsonConverter<double?>
+{
+    public override double? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.TokenType == JsonTokenType.Null ? null : reader.GetDouble();
+
+    public override void Write(Utf8JsonWriter writer, double? value, JsonSerializerOptions options)
+    {
+        if (value is { } v && double.IsFinite(v)) writer.WriteNumberValue(v);
+        else writer.WriteNullValue();
     }
 }

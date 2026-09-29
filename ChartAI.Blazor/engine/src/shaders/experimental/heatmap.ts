@@ -1,20 +1,22 @@
-import { UNIFORM_STRUCT, COMPUTE_WG } from "../shared.ts";
+import { UNIFORM_STRUCT } from "../shared.ts";
 
-export const HEATMAP_COMPUTE_SHADER = `${UNIFORM_STRUCT}
+// One quad per cell (6 vertices, triangle-list), drawn by the rasterizer: a cell costs the same
+// however far the view is zoomed in, where filling it texel by texel in one invocation did not.
+// Each cell is one data unit wide and tall, centred on its (x, y) = (column, row).
+export const HEATMAP_RENDER_SHADER = `${UNIFORM_STRUCT}
 struct HeatmapUniforms {
-  dispatchXCount: u32,
   gridColumns: u32,
   gridRows: u32,
   colorScale: u32,
+  _p0: u32,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read> dataX: array<f32>;
 @group(0) @binding(2) var<storage, read> dataY: array<f32>;
-@group(0) @binding(3) var outputTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
-@group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
-@group(0) @binding(6) var<uniform> hu: HeatmapUniforms;
-@group(0) @binding(7) var<storage, read> dataValue: array<f32>;
+@group(0) @binding(3) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(4) var<uniform> seriesIdx: SeriesIndex;
+@group(0) @binding(5) var<uniform> hu: HeatmapUniforms;
+@group(0) @binding(6) var<storage, read> dataValue: array<f32>;
 fn viridis(t: f32) -> vec3f {
   let c0 = vec3f(0.267, 0.005, 0.329);
   let c1 = vec3f(0.229, 0.322, 0.545);
@@ -50,40 +52,40 @@ fn applyColorScale(t: f32, scale: u32) -> vec3f {
   if (scale == 3u) { return mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), tc); }
   return viridis(tc);
 }
-@compute @workgroup_size(${COMPUTE_WG})
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let series = allSeries[seriesIdx.index];
-  let visStart = series.visibleRange.x;
-  let visCount = series.visibleRange.y;
-  let localIdx = id.y * hu.dispatchXCount + id.x;
-  if (localIdx >= visCount) { return; }
-  let idx = visStart + localIdx;
-  if (idx >= u.pointCount) { return; }
+struct VertexOutput {
+  @builtin(position) pos: vec4f,
+  @location(0) @interpolate(flat) color: vec3f,
+};
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VertexOutput {
+  var out: VertexOutput;
+  out.pos = vec4f(0.0, 0.0, 0.0, 0.0);
+  out.color = vec3f(0.0);
+  // This series' cells: [visibleRange.x, visibleRange.x + visibleRange.y) of its buffers.
+  let range = allSeries[seriesIdx.index].visibleRange;
+  let cell = vi / 6u;
+  if (cell >= range.y) { return out; }
+  let idx = range.x + cell;
   let col = dataX[idx];
   let row = dataY[idx];
   let t = dataValue[idx];
+  // A gap (-3e38, GPU_GAP in chart-library.ts; a missing sorted x is +3e38) in any channel
+  // draws no cell.
+  if (abs(col) > 1.0e38 || row < -1.0e38 || t < -1.0e38) { return out; }
   let rangeX = u.viewMaxX - u.viewMinX;
   let rangeY = u.viewMaxY - u.viewMinY;
-  if (rangeX < 0.0001 || rangeY < 0.0001) { return; }
-  let normX = (col - u.viewMinX) / rangeX;
-  let normY = (row - u.viewMinY) / rangeY;
-  let centerX = normX * u.width;
-  let centerY = (1.0 - normY) * u.height;
-  let cellHalfW = 0.5 * u.width / rangeX;
-  let cellHalfH = 0.5 * u.height / rangeY;
-  let iWidth = i32(u.width);
-  let iHeight = i32(u.height);
-  let x0 = max(0, i32(centerX - cellHalfW));
-  let x1 = min(iWidth - 1, i32(centerX + cellHalfW));
-  let y0 = max(0, i32(centerY - cellHalfH));
-  let y1 = min(iHeight - 1, i32(centerY + cellHalfH));
-  if (x0 > x1 || y0 > y1) { return; }
-  let rgb = applyColorScale(t, hu.colorScale);
-  let color = vec4f(rgb, 1.0);
-  for (var py = y0; py <= y1; py++) {
-    for (var px = x0; px <= x1; px++) {
-      textureStore(outputTex, vec2i(px, py), color);
-    }
-  }
+  if (rangeX <= 0.0 || rangeY <= 0.0) { return out; }
+  var corners = array<vec2f, 6>(
+    vec2f(-0.5, -0.5), vec2f(0.5, -0.5), vec2f(-0.5, 0.5),
+    vec2f(-0.5, 0.5), vec2f(0.5, -0.5), vec2f(0.5, 0.5)
+  );
+  let c = corners[vi % 6u];
+  let normX = (col + c.x - u.viewMinX) / rangeX;
+  let normY = (row + c.y - u.viewMinY) / rangeY;
+  out.pos = vec4f(normX * 2.0 - 1.0, normY * 2.0 - 1.0, 0.0, 1.0);
+  out.color = applyColorScale(t, hu.colorScale);
+  return out;
+}
+@fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
+  return vec4f(in.color, 1.0);
 }
 `;
