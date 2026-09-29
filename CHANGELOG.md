@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-29
+
 ### Added
 - `BarOpacity` on `ChartConfig` (engine uniform `barOpacity`): the fill opacity of a bar chart's bars, 0 to 1, default 1. The bar shader used a fixed 0.85, but every pixel column a bar covered redrew the whole bar, so the fills stacked to opaque anyway; each bar is now drawn once, which is what makes the opacity take effect.
 - `Chart.Ready` (`Task<bool>`): completes with true once the chart is initialized, false when WebGPU is unavailable, initialization failed or the component was disposed first.
@@ -102,7 +104,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Multiple Y axes with left/right placement (`ChartConfig.YAxes`, `ChartSeries.YAxis`).
 - Built-in axis formatters (`AxisFormat`).
 
-[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jaafaust/ChartAI.Blazor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jaafaust/ChartAI.Blazor/releases/tag/v1.0.0
